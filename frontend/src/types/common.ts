@@ -1,0 +1,12 @@
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+export interface PaginationParams {
+  page: number;
+  size: number;
+}

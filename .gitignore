@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Node
+node_modules/
+node_modules.nosync/
+**/node_modules/
+**/node_modules.nosync/
+frontend/dist/
+# iCloud Drive artifacts
+* 2/
+*.nosync
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+postgres_data/
+
+# Database
+*.db
+*.sqlite3
