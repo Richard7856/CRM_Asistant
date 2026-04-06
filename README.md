@@ -22,34 +22,19 @@
 > Screenshots taken from a live local instance with seeded demo data (7 agents, 5 departments, 30 days of metrics).
 
 ### Dashboard — Live activity feed + agent fleet status
-![Dashboard](docs/screenshots/01-dashboard.png)
+![Dashboard](docs/screenshots/Dash.png)
 
 ### Agents — Full team roster with status, department, and origin
-![Agentes](docs/screenshots/02-agentes.png)
-
-### Agent Detail — Config, prompt history, and activity log
-![Content Creator](docs/screenshots/03-content-creator.png)
-
-### Org Chart — Interactive hierarchy tree
-![Org Chart](docs/screenshots/04-org-chart.png)
+![Agentes](docs/screenshots/Agentes.png)
 
 ### Tasks — Kanban board with real AI-generated outputs
-![Tareas Kanban](docs/screenshots/05-tareas-kanban.png)
+![Tareas Kanban](docs/screenshots/Tareas.png)
 
 ### Metrics — 30-day performance trends across all agents
-![Métricas](docs/screenshots/06-metricas.png)
+![Métricas](docs/screenshots/Metricas.png)
 
 ### CEO Dashboard — Org-wide KPIs and department health
-![CEO Dashboard](docs/screenshots/07-ceo-dashboard.png)
-
-### Knowledge Base — RAG document management
-![Knowledge Base](docs/screenshots/08-knowledge.png)
-
-### Activity Log — Full audit trail with filters
-![Actividades](docs/screenshots/09-actividades.png)
-
-### Prompt Library — Version control for agent system prompts
-![Prompts](docs/screenshots/10-prompts.png)
+![CEO Dashboard](docs/screenshots/Ceo.png)
 
 ---
 
