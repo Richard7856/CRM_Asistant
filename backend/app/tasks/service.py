@@ -1,13 +1,18 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginationParams
+from app.departments.models import Department
 from app.tasks.models import Task, TaskPriority, TaskStatus
 from app.tasks.repository import TaskRepository
 from app.tasks.schemas import TaskCreate, TaskResponse, TaskUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class TaskService:
@@ -25,16 +30,46 @@ class TaskService:
             resp.assignee_name = task.assignee.name
         return resp
 
+    async def _resolve_assignee(self, data: TaskCreate) -> uuid.UUID | None:
+        """Auto-assign to department supervisor when department_id is set but assigned_to is not.
+
+        This routes tasks to the department head (supervisor) first,
+        who can then delegate to subordinates via the supervisor delegator.
+        """
+        if data.assigned_to:
+            return data.assigned_to
+
+        if not data.department_id:
+            return None
+
+        result = await self.db.execute(
+            select(Department.head_agent_id).where(
+                Department.id == data.department_id,
+                Department.organization_id == self.org_id,
+            )
+        )
+        head_agent_id = result.scalar_one_or_none()
+
+        if head_agent_id:
+            logger.info(
+                "Auto-assigned task to dept supervisor %s (dept %s)",
+                head_agent_id, data.department_id,
+            )
+
+        return head_agent_id
+
     async def create_task(self, data: TaskCreate) -> TaskResponse:
+        assigned_to = await self._resolve_assignee(data)
+
         task = Task(
             title=data.title,
             description=data.description,
             priority=data.priority,
-            assigned_to=data.assigned_to,
+            assigned_to=assigned_to,
             department_id=data.department_id,
             parent_task_id=data.parent_task_id,
             due_at=data.due_at,
-            status=TaskStatus.ASSIGNED if data.assigned_to else TaskStatus.PENDING,
+            status=TaskStatus.ASSIGNED if assigned_to else TaskStatus.PENDING,
             organization_id=self.org_id,
         )
         task = await self.repo.create(task)

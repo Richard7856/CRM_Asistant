@@ -2,6 +2,7 @@
 Knowledge Base repository — database operations for documents and chunks.
 Search uses PostgreSQL full-text search (tsvector/tsquery) — no external vector DB needed.
 """
+import re
 import uuid
 import logging
 
@@ -12,6 +13,9 @@ from sqlalchemy.orm import selectinload
 from app.knowledge.models import KnowledgeChunk, KnowledgeDocument
 
 logger = logging.getLogger(__name__)
+
+# Max words to send to tsquery — long queries waste DB time and can hit syntax limits
+_MAX_QUERY_TERMS = 20
 
 
 class KnowledgeRepository:
@@ -67,12 +71,13 @@ class KnowledgeRepository:
             return []
 
         # Build OR-based tsquery so partial matches work.
-        # plainto_tsquery ANDs all terms — "linkedin post contenido" requires ALL
-        # three words in the same chunk, which almost never happens.
-        # Instead: split query, filter single-char noise, join with | (OR) so any
-        # term matching a chunk surfaces it; ts_rank then orders by relevance.
-        raw_terms = [t.strip() for t in query.split() if len(t.strip()) > 1]
-        ts_expr = " | ".join(raw_terms) if raw_terms else query.strip()
+        # Strip everything except alphanumeric + spaces — markdown, punctuation,
+        # and special chars (**, |, :, etc.) break to_tsquery() syntax.
+        sanitized = re.sub(r"[^\w\s]", " ", query, flags=re.UNICODE)
+        raw_terms = [t for t in sanitized.split() if len(t) > 2][:_MAX_QUERY_TERMS]
+        if not raw_terms:
+            return []
+        ts_expr = " | ".join(raw_terms)
         query_ts = func.to_tsquery("pg_catalog.simple", ts_expr)
 
         # Build WHERE clause based on scope

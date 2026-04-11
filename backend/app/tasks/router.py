@@ -4,6 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.tasks.models import Task, TaskPriority, TaskStatus
@@ -11,7 +12,7 @@ from app.tasks.schemas import TaskAssign, TaskCreate, TaskResponse, TaskUpdate
 from app.auth.dependencies import get_org_id
 from app.tasks.service import TaskService
 from app.workers.agent_executor import execute_task_background
-from app.agents.models import Agent
+from app.agents.models import Agent, Role, RoleLevel
 
 router = APIRouter()
 
@@ -103,18 +104,28 @@ async def execute_task_endpoint(
     if task.assigned_to is None:
         raise HTTPException(status_code=400, detail="Task has no assigned agent")
 
-    # Verify agent exists
+    # Load agent with role to decide execution path
     agent_result = await db.execute(
-        select(Agent).where(Agent.id == task.assigned_to)
+        select(Agent).options(selectinload(Agent.role)).where(Agent.id == task.assigned_to)
     )
-    if agent_result.scalar_one_or_none() is None:
+    agent = agent_result.scalar_one_or_none()
+    if agent is None:
         raise HTTPException(status_code=400, detail="Assigned agent not found")
 
-    # Launch execution in background — does NOT block this response
-    asyncio.create_task(
-        execute_task_background(task_id),
-        name=f"exec-task-{task_id}",
-    )
+    # Supervisors delegate to subordinates; regular agents execute directly
+    is_supervisor = agent.role and agent.role.level in (RoleLevel.SUPERVISOR, RoleLevel.MANAGER)
+
+    if is_supervisor:
+        from app.workers.supervisor_delegator import delegate_task_background
+        asyncio.create_task(
+            delegate_task_background(task_id),
+            name=f"delegate-task-{task_id}",
+        )
+    else:
+        asyncio.create_task(
+            execute_task_background(task_id),
+            name=f"exec-task-{task_id}",
+        )
 
     return TaskResponse.model_validate(task)
 

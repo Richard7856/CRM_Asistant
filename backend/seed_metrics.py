@@ -1,6 +1,12 @@
 """
-Seed script to populate 30 days of realistic daily metrics for all agents.
+Seed script — 30 days of realistic daily metrics for all DigitalMind agents.
+
+Each agent has a unique performance profile that reflects its role:
+supervisors handle fewer tasks but with high success rate,
+operational agents handle more tasks with role-appropriate characteristics.
+
 Run: python seed_metrics.py
+Re-run safe: uses ON CONFLICT to upsert existing records.
 """
 
 import asyncio
@@ -16,7 +22,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.agents.models import Agent
-from app.core.database import async_session_factory, engine, Base
+from app.auth.models import Organization  # noqa: F401 — needed for Agent relationship resolution
+from app.core.database import async_session_factory
 from app.metrics.models import MetricPeriod, PerformanceMetric
 
 # Import all models so relationships resolve
@@ -27,10 +34,19 @@ from app.improvements.models import ImprovementPoint  # noqa: F401
 from app.departments.models import Department  # noqa: F401
 
 
-# Agent profiles with different performance characteristics
+# Per-agent performance profiles that tell a story in the dashboard.
+# (base_success_rate, base_tasks_per_day, base_latency_ms, base_tokens, base_cost_usd)
 AGENT_PROFILES = {
-    # slug -> (base_success_rate, base_tasks_per_day, base_latency_ms, base_tokens, base_cost)
-    "default": (0.92, 15, 800, 50000, 1.20),
+    # Supervisors: fewer tasks (they coordinate), high success, moderate cost
+    "director-contenido": (0.95, 6, 1200, 60000, 1.80),
+    "account-manager":    (0.93, 8, 900, 45000, 1.40),
+    "strategist":         (0.96, 5, 1500, 70000, 2.10),
+    # Operational agents: more tasks, varied performance
+    "copywriter":         (0.91, 18, 800, 55000, 1.50),   # high volume, good quality
+    "investigador":       (0.88, 12, 1100, 80000, 2.00),   # slower (research), more tokens
+    "analista-propuestas":(0.90, 10, 1400, 65000, 1.80),   # moderate, detailed output
+    "soporte-tecnico":    (0.85, 20, 600, 30000, 0.80),    # high volume, lower success (external)
+    "data-analyst":       (0.94, 14, 700, 90000, 2.20),    # fast, heavy on tokens (data crunching)
 }
 
 DAYS_BACK = 30
@@ -42,12 +58,20 @@ def _jitter(base: float, pct: float = 0.15) -> float:
 
 
 def _trend(day_index: int, days_total: int, strength: float = 0.05) -> float:
-    """Slight upward trend over time."""
+    """Slight upward trend over time — agents improve with use."""
     return 1 + (day_index / days_total) * strength
 
 
 async def seed_metrics():
     async with async_session_factory() as session:
+        # Get org_id
+        org_result = await session.execute(select(Organization.id).limit(1))
+        org_row = org_result.first()
+        if org_row is None:
+            print("ERROR: No organization found. Run seed.py first.")
+            return
+        org_id = org_row[0]
+
         # Get all agents
         result = await session.execute(select(Agent.id, Agent.name, Agent.slug))
         agents = result.all()
@@ -58,16 +82,17 @@ async def seed_metrics():
 
         print(f"Generating {DAYS_BACK} days of metrics for {len(agents)} agents...")
 
-        now = datetime.utcnow()
+        # DB columns are TIMESTAMP WITHOUT TIME ZONE — use naive datetimes
+        now = datetime.utcnow()  # noqa: DTZ003
         records_created = 0
 
         for agent_id, agent_name, agent_slug in agents:
-            # Assign a unique profile per agent with some randomness
-            base_success = random.uniform(0.82, 0.97)
-            base_tasks = random.randint(8, 30)
-            base_latency = random.uniform(300, 1800)
-            base_tokens = random.randint(20000, 100000)
-            base_cost = random.uniform(0.50, 3.00)
+            # Use agent-specific profile, fall back to sensible defaults
+            profile = AGENT_PROFILES.get(agent_slug)
+            if profile:
+                base_success, base_tasks, base_latency, base_tokens, base_cost = profile
+            else:
+                base_success, base_tasks, base_latency, base_tokens, base_cost = (0.90, 12, 900, 50000, 1.20)
 
             for day_offset in range(DAYS_BACK, 0, -1):
                 date = now - timedelta(days=day_offset)
@@ -77,13 +102,11 @@ async def seed_metrics():
 
                 trend = _trend(day_index, DAYS_BACK)
 
-                # Calculate metrics with variance
                 tasks_total = max(1, int(_jitter(base_tasks * trend, 0.3)))
                 success_rate = min(0.9999, max(0.60, _jitter(base_success * trend, 0.08)))
                 tasks_completed = max(0, int(tasks_total * success_rate))
                 tasks_failed = tasks_total - tasks_completed
 
-                # Recalculate success rate from actual counts
                 actual_sr = tasks_completed / tasks_total if tasks_total > 0 else None
 
                 avg_response_ms = max(50, _jitter(base_latency / trend, 0.2))
@@ -91,7 +114,7 @@ async def seed_metrics():
                 cost_usd = max(0, round(_jitter(base_cost * trend, 0.2), 4))
                 activity_count = max(0, int(_jitter(tasks_total * 3, 0.3)))
 
-                # Occasional bad days (simulate incidents)
+                # ~5% chance of a bad day (simulate incidents)
                 if random.random() < 0.05:
                     tasks_failed += random.randint(3, 8)
                     actual_sr = tasks_completed / (tasks_completed + tasks_failed) if (tasks_completed + tasks_failed) > 0 else None
@@ -100,6 +123,7 @@ async def seed_metrics():
                 values = {
                     "id": uuid.uuid4(),
                     "agent_id": agent_id,
+                    "organization_id": org_id,
                     "period": MetricPeriod.DAILY,
                     "period_start": day_start,
                     "period_end": day_end,
@@ -128,9 +152,9 @@ async def seed_metrics():
                 await session.execute(stmt)
                 records_created += 1
 
-            print(f"  {agent_name}: {DAYS_BACK} daily records")
+            print(f"  {agent_name} ({agent_slug}): {DAYS_BACK} daily records")
 
-        # Generate weekly rollups
+        # Generate weekly rollups from daily data
         print("Generating weekly rollups...")
         for week_offset in range(4):
             week_end_day = now - timedelta(days=now.weekday() + 7 * week_offset)
@@ -140,7 +164,6 @@ async def seed_metrics():
             week_end = week_start + timedelta(days=7)
 
             for agent_id, agent_name, _ in agents:
-                # Aggregate from daily
                 daily_result = await session.execute(
                     select(PerformanceMetric).where(
                         PerformanceMetric.agent_id == agent_id,
@@ -163,6 +186,7 @@ async def seed_metrics():
                 values = {
                     "id": uuid.uuid4(),
                     "agent_id": agent_id,
+                    "organization_id": org_id,
                     "period": MetricPeriod.WEEKLY,
                     "period_start": week_start,
                     "period_end": week_end,

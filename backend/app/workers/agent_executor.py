@@ -84,12 +84,12 @@ async def _retrieve_rag_context(
     query: str,
     db: AsyncSession,
     top_k: int = 5,
-) -> tuple[str | None, int]:
+) -> tuple[str | None, int, list[dict]]:
     """
     Retrieve relevant knowledge chunks for the agent's task using full-text search.
-    Returns (formatted_context_string | None, chunks_found_count).
+    Returns (formatted_context_string | None, chunks_found_count, source_citations).
 
-    Fail-open: if retrieval fails for any reason, returns (None, 0) so
+    Fail-open: if retrieval fails for any reason, returns (None, 0, []) so
     task execution continues with the original system prompt.
 
     Searches org-level KB + dept-level KB for the agent's department.
@@ -103,17 +103,27 @@ async def _retrieve_rag_context(
             limit=top_k,
         )
         if not results:
-            return None, 0
+            return None, 0, []
 
         sections = []
+        sources = []
         for chunk, rank in results:
             sections.append(f"[Relevancia: {rank:.3f}]\n{chunk.content}")
+            sources.append({
+                "document_title": chunk.document.title if chunk.document else "Unknown",
+                "document_id": str(chunk.document_id),
+                "chunk_index": chunk.chunk_index,
+                "relevance": round(float(rank), 3),
+            })
 
         context = "\n\n---\n\n".join(sections)
-        return context, len(results)
+        return context, len(results), sources
     except Exception as exc:
         logger.warning("RAG retrieval failed (non-fatal): %s", exc)
-        return None, 0
+        # Rollback to clear the failed transaction state so subsequent
+        # DB operations in this session still work (e.g. task execution)
+        await db.rollback()
+        return None, 0, []
 
 
 async def execute_task(task_id: uuid.UUID, db: AsyncSession) -> Task:
@@ -278,7 +288,7 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
 
         # RAG: retrieve relevant knowledge chunks and inject into system prompt
         rag_query = f"{task.title} {task.description or ''}".strip()
-        rag_context, rag_chunks_found = await _retrieve_rag_context(agent, rag_query, db)
+        rag_context, rag_chunks_found, rag_sources = await _retrieve_rag_context(agent, rag_query, db)
 
         system_prompt = definition.system_prompt or "Eres un agente de IA asistente."
         if rag_context:
@@ -324,6 +334,7 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
             },
             "elapsed_ms": elapsed_ms,
             "stop_reason": response.stop_reason,
+            "kb_sources": rag_sources,
         }
 
         agent.status = AgentStatus.ACTIVE

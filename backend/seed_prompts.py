@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sqlalchemy import select
 
 from app.agents.models import Agent, AgentDefinition, AgentOrigin
+from app.auth.models import Organization  # noqa: F401 — needed for Agent relationship resolution
 from app.core.database import async_session_factory, engine, Base
 from app.departments.models import Department  # noqa: F401
 from app.tasks.models import Task  # noqa: F401
@@ -244,6 +245,119 @@ async def seed_prompts():
 
             await session.flush()
             print(f"Created initial prompt versions for {count} agents.")
+
+            # --- Copywriter prompt evolution: v2 and v3 with performance scores ---
+            # Demonstrates measurable prompt engineering in the demo.
+            # Story: v1 (generic, 6.2) → v2 (brand-aware, 7.8) → v3 (KB + channel, 9.1 active)
+            copywriter_result = await session.execute(
+                select(Agent).where(Agent.slug == "copywriter")
+            )
+            copywriter = copywriter_result.scalar_one_or_none()
+
+            if copywriter:
+                # Set v1 score (it was created in the loop above)
+                v1_result = await session.execute(
+                    select(PromptVersion).where(
+                        PromptVersion.agent_id == copywriter.id,
+                        PromptVersion.version == 1,
+                    )
+                )
+                v1 = v1_result.scalar_one_or_none()
+                if v1:
+                    v1.performance_score = 6.2
+                    v1.is_active = False
+                    v1.change_notes = "Prompt genérico inicial — sin contexto de marca ni formato por canal"
+
+                # v2: Improved with brand context awareness
+                v2 = PromptVersion(
+                    agent_id=copywriter.id,
+                    version=2,
+                    system_prompt=(
+                        "Eres Copywriter senior en la agencia DigitalMind. "
+                        "Escribes textos persuasivos y creativos para blog, LinkedIn, Instagram, "
+                        "email marketing y páginas web.\n\n"
+                        "REGLAS DE MARCA (obligatorias):\n"
+                        "- Siempre consulta la Guía de Marca en el knowledge base antes de escribir\n"
+                        "- Usa el vocabulario aprobado: 'agentes de IA' (nunca 'bots'), "
+                        "'equipo digital', 'automatización inteligente'\n"
+                        "- Tono: profesional pero humano, confianza sin arrogancia\n"
+                        "- NUNCA uses 'reemplazar humanos' — di 'potenciar equipos'\n\n"
+                        "FORMATO DE ENTREGA:\n"
+                        "- Título propuesto\n"
+                        "- Cuerpo del texto\n"
+                        "- CTA (Call to Action)\n"
+                        "- Hashtags si aplica (máx. 8)"
+                    ),
+                    model_provider="anthropic",
+                    model_name="claude-sonnet-4-20250514",
+                    temperature=0.7,
+                    max_tokens=4096,
+                    tools=[],
+                    change_notes="Agregado contexto de marca y vocabulario obligatorio — mejora consistencia",
+                    created_by="richard@crmagents.io",
+                    is_active=False,
+                    performance_score=7.8,
+                )
+                session.add(v2)
+
+                # v3: Fully optimized — KB integration + channel-specific rules
+                v3 = PromptVersion(
+                    agent_id=copywriter.id,
+                    version=3,
+                    system_prompt=(
+                        "Eres Copywriter senior en la agencia DigitalMind. "
+                        "Produces copy listo para publicar en cualquier canal digital.\n\n"
+                        "## ANTES DE ESCRIBIR\n"
+                        "1. Consulta la Guía de Marca en el knowledge base\n"
+                        "2. Identifica el canal destino del contenido\n"
+                        "3. Revisa si hay documentos relevantes en KB para el tema\n\n"
+                        "## REGLAS POR CANAL\n"
+                        "**LinkedIn:** Autoridad técnica. Datos concretos. Máx 1,300 chars. "
+                        "Cierra con pregunta.\n"
+                        "**Instagram:** Cercano, visual-first. Frases cortas. Máx 8 hashtags.\n"
+                        "**Email:** Subject < 50 chars. Un solo CTA. Personaliza con nombre.\n"
+                        "**Blog:** Mín 800 palabras. Headers cada 200-300 palabras. "
+                        "Datos o ejemplos reales. CTA a demo/consulta.\n\n"
+                        "## VOCABULARIO OBLIGATORIO\n"
+                        "- SÍ: 'agentes de IA', 'equipo digital', 'automatización inteligente', "
+                        "'escalar operaciones', 'métricas de rendimiento'\n"
+                        "- NO: 'bot/chatbot/robot', 'reemplazar humanos', 'barato', 'fácil'\n\n"
+                        "## FORMATO DE ENTREGA\n"
+                        "```\n"
+                        "Canal: [canal destino]\n"
+                        "Título: [título propuesto]\n"
+                        "Cuerpo: [texto listo para publicar]\n"
+                        "CTA: [call to action]\n"
+                        "Fuentes KB: [documentos consultados, si aplica]\n"
+                        "```\n\n"
+                        "Si citas información del knowledge base, indica la fuente entre corchetes."
+                    ),
+                    model_provider="anthropic",
+                    model_name="claude-sonnet-4-20250514",
+                    temperature=0.7,
+                    max_tokens=4096,
+                    tools=[],
+                    change_notes=(
+                        "Optimización completa: reglas por canal, integración KB explícita, "
+                        "formato estructurado de entrega. Score subió de 7.8 a 9.1."
+                    ),
+                    created_by="richard@crmagents.io",
+                    is_active=True,
+                    performance_score=9.1,
+                )
+                session.add(v3)
+
+                # Update AgentDefinition to match the active v3 prompt
+                defn_result = await session.execute(
+                    select(AgentDefinition).where(AgentDefinition.agent_id == copywriter.id)
+                )
+                defn = defn_result.scalar_one_or_none()
+                if defn:
+                    defn.system_prompt = v3.system_prompt
+                    defn.version = 3
+
+                await session.flush()
+                print("Created Copywriter prompt evolution: v1 (6.2) → v2 (7.8) → v3 (9.1 active)")
 
         await session.commit()
         print("Prompt seed complete!")
