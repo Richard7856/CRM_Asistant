@@ -640,6 +640,7 @@
         <a href="#architecture">Arquitectura</a>
         <a href="#stack">Tech Stack</a>
         <a href="#roadmap">Roadmap</a>
+        <a href="#inversion" style="color: var(--primary); font-weight: 600;">Inversión</a>
         <a href="#demo" class="btn-primary" style="padding: 10px 24px; font-size: 13px;">Demo en Vivo</a>
       </div>
     </div>
@@ -657,9 +658,8 @@
         como un <span class="gradient">equipo real</span>
       </h1>
       <p>
-        CRM Agents es una plataforma enterprise que permite crear, gestionar y ejecutar
-        agentes de IA con estructura organizacional: departamentos, roles, supervisores
-        y tareas — todo con ejecucion en tiempo real via Claude API.
+        CRM Agents es el panel de control para tus asistentes de IA. Organízalos en equipos,
+        asígnales tareas y mide sus resultados — igual que harías con personas reales.
       </p>
       <div class="hero-actions">
         <a href="#demo" class="btn-primary">
@@ -795,18 +795,18 @@
       <div class="problem-grid">
         <div class="problem-card">
           <div class="number">1</div>
-          <h3>Agentes dispersos</h3>
-          <p>Cada equipo crea sus propios agentes sin coordinacion. No hay visibilidad de quien hace que, duplicacion de esfuerzo y cero accountability.</p>
+          <h3>Asistentes dispersos</h3>
+          <p>Cada área tiene sus propios asistentes de IA sin coordinación. Nadie sabe qué hace cada uno ni si están cumpliendo su función.</p>
         </div>
         <div class="problem-card">
           <div class="number">2</div>
-          <h3>Sin estructura organizacional</h3>
-          <p>Los agentes no tienen departamentos, roles ni supervisores. No hay jerarquia que permita escalar de 5 a 500 agentes de forma ordenada.</p>
+          <h3>Sin orden ni jerarquía</h3>
+          <p>Tus asistentes no tienen departamento ni responsable. Cuando escalan los problemas, no hay a quién rendirle cuentas.</p>
         </div>
         <div class="problem-card">
           <div class="number">3</div>
-          <h3>Ejecucion opaca</h3>
-          <p>No hay trazabilidad de tareas, costos por agente, tasas de exito ni logs de actividad. Las decisiones se toman a ciegas.</p>
+          <h3>No sabes si funcionan bien</h3>
+          <p>No tienes forma de saber si un asistente está funcionando bien o mal, cuánto te cuesta o qué hizo durante el día.</p>
         </div>
       </div>
     </div>
@@ -819,7 +819,7 @@
       <h2>El mercado de agentes IA crece<br/>mas rapido que cualquier otro en tech</h2>
       <p class="section-desc">
         La gestion de agentes de IA es la nueva frontera. Las empresas estan pasando de "usar IA" a "gestionar equipos de IA".
-        Quien controle la capa de orquestacion, controla el flujo de valor.
+        Quien controle la gestión de sus asistentes de IA, controla el flujo de valor.
       </p>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 48px;">
         <div class="neu" style="padding: 36px; text-align: center;">
@@ -839,11 +839,10 @@
         </div>
       </div>
       <div class="neu-pressed" style="padding: 32px; margin-top: 48px;">
-        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">La tesis de inversion</h3>
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Por qué ahora</h3>
         <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.8;">
-          Hoy las empresas tienen herramientas para <strong>crear</strong> agentes (LangChain, CrewAI, n8n) pero <strong>ninguna</strong> para <strong>gestionarlos</strong> como activos productivos.
-          Es como tener empleados sin HR, sin organigrama, sin evaluaciones de desempenio. CRM Agents es la capa de gestion que falta — el "Salesforce de los agentes IA".
-          Capturamos el valor no en la creacion del agente, sino en su operacion continua: monitoreo, optimizacion, compliance y gobernanza.
+          Hoy las empresas tienen herramientas para <strong>crear</strong> asistentes de IA, pero <strong>ninguna</strong> para <strong>gestionarlos</strong> como un equipo de trabajo.
+          Es como tener empleados sin recursos humanos, sin organigrama y sin evaluaciones de desempeño. CRM Agents llena ese vacío.
         </p>
       </div>
     </div>
@@ -862,37 +861,22 @@
           <div style="width: 60px; height: 60px; border-radius: 16px; background: rgba(99,102,241,0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: var(--primary-soft); margin-bottom: 20px;">1</div>
           <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 10px;">Estructura tu organizacion</h3>
           <p style="font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.7;">
-            Crea departamentos (Marketing, Ventas, Soporte, etc.), define roles (agente, supervisor, manager) y establece la jerarquia de tu equipo de IA.
-            Exactamente como harias con empleados humanos.
+            Crea departamentos (Marketing, Ventas, Soporte) y define qué rol tiene cada asistente dentro de tu organización — igual que harías al contratar empleados.
           </p>
-          <div class="neu-dark" style="margin-top: 16px; padding: 16px 20px; border-radius: 12px;">
-            <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--primary-soft);">POST /api/v1/departments</code>
-            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px;">{"name": "Marketing Digital", "description": "..."}</div>
-          </div>
         </div>
         <div>
           <div style="width: 60px; height: 60px; border-radius: 16px; background: rgba(52,211,153,0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: var(--success); margin-bottom: 20px;">2</div>
           <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 10px;">Crea o conecta agentes</h3>
           <p style="font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.7;">
-            <strong style="color: rgba(255,255,255,0.8);">Internos:</strong> Define system prompt, modelo, temperatura y tools. Se ejecutan via Claude API directamente.
-            <br/><strong style="color: rgba(255,255,255,0.8);">Externos:</strong> Conecta agentes de n8n, LangChain o CrewAI via webhook/API key. Un solo panel para todos.
+            Crea asistentes nuevos o conecta los que ya tienes. Pueden trabajar con inteligencia artificial propia o integrarse con herramientas que tu empresa ya usa.
           </p>
-          <div class="neu-dark" style="margin-top: 16px; padding: 16px 20px; border-radius: 12px;">
-            <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--success);">POST /api/v1/agents/register</code>
-            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px;">{"origin": "external", "platform": "n8n", ...}</div>
-          </div>
         </div>
         <div>
           <div style="width: 60px; height: 60px; border-radius: 16px; background: rgba(251,191,36,0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: var(--warning); margin-bottom: 20px;">3</div>
           <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 10px;">Asigna tareas y mide resultados</h3>
           <p style="font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.7;">
-            Asigna tareas a agentes, ejecuta con un click, recibe resultados en tiempo real via SSE.
-            Cada ejecucion genera metricas: tokens, latencia, costo, tasa de exito. Todo trazable.
+            Asigna tareas, ejecútalas con un clic y recibe los resultados al instante. Cada tarea queda registrada: qué hizo el asistente, cuánto tardó y qué resultado entregó.
           </p>
-          <div class="neu-dark" style="margin-top: 16px; padding: 16px 20px; border-radius: 12px;">
-            <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--warning);">POST /api/v1/tasks/{id}/execute</code>
-            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px;">Resultado en 2-5 segundos via SSE &rarr; Dashboard actualizado</div>
-          </div>
         </div>
       </div>
     </div>
@@ -911,19 +895,19 @@
           <div style="font-size: 28px; margin-bottom: 16px;">&#127970;</div>
           <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Seguros & Financiero</h3>
           <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
-            Agentes que procesan siniestros, validan documentos, califican riesgo y atienden clientes.
-            <strong>Requieren:</strong> audit trail completo, permisos por rol, compliance por regulacion.
+            Asistentes que procesan siniestros, validan documentos, califican riesgo y atienden clientes.
+            <strong>Requieren:</strong> registro completo de cada acción, permisos por cargo, cumplimiento regulatorio.
           </p>
           <div class="neu-pressed" style="margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 12px; color: var(--primary);">
-            Ejemplo: 8 agentes procesando 200+ siniestros/dia con trazabilidad total
+            Ejemplo: 8 asistentes procesando 200+ siniestros/día con registro completo
           </div>
         </div>
         <div class="neu" style="padding: 32px;">
           <div style="font-size: 28px; margin-bottom: 16px;">&#128722;</div>
           <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">E-commerce & Retail</h3>
           <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
-            Agentes de soporte, generacion de contenido de producto, pricing dinamico, analisis de resenas.
-            <strong>Requieren:</strong> ejecucion en tiempo real, integracion con plataformas existentes.
+            Asistentes de soporte, generación de contenido de producto, precios automáticos, análisis de reseñas.
+            <strong>Requieren:</strong> respuesta inmediata, conexión con plataformas existentes.
           </p>
           <div class="neu-pressed" style="margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 12px; color: var(--primary);">
             Ejemplo: Equipo de 15 agentes manejando catalogo de 50K SKUs
@@ -933,8 +917,8 @@
           <div style="font-size: 28px; margin-bottom: 16px;">&#128187;</div>
           <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Consultoras & Agencias</h3>
           <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
-            Agentes por cliente, por proyecto, por vertical. Multi-tenant por naturaleza.
-            <strong>Requieren:</strong> separacion de datos por organizacion, metricas por equipo.
+            Asistentes por cliente, por proyecto, por vertical.
+            <strong>Requieren:</strong> separación de datos por organización, métricas por equipo.
           </p>
           <div class="neu-pressed" style="margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 12px; color: var(--primary);">
             Ejemplo: Consultora con 40+ agentes sirviendo a 12 clientes simultaneamente
@@ -944,8 +928,8 @@
           <div style="font-size: 28px; margin-bottom: 16px;">&#127973;</div>
           <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Contact Centers</h3>
           <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">
-            Agentes de triage, clasificacion de tickets, respuesta automatizada, escalacion inteligente.
-            <strong>Requieren:</strong> jerarquia supervisor-agente, metricas de SLA, integracion con Genesys/Zendesk.
+            Asistentes de filtrado y clasificación de solicitudes, respuesta automatizada, escalación inteligente.
+            <strong>Requieren:</strong> jerarquía supervisor-asistente, métricas de tiempo de respuesta, conexión con plataformas de atención al cliente.
           </p>
           <div class="neu-pressed" style="margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 12px; color: var(--primary);">
             Ejemplo: 20 agentes IA atendiendo L1, humanos solo en L2+
@@ -973,8 +957,8 @@
           <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 20px;">Hasta 10 agentes</div>
           <div style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 2;">
             &#10003; Departamentos ilimitados<br/>
-            &#10003; Ejecucion via Claude API<br/>
-            &#10003; Dashboard de metricas<br/>
+            &#10003; Ejecución de tareas con IA<br/>
+            &#10003; Panel de métricas<br/>
             &#10003; 1 usuario
           </div>
         </div>
@@ -988,10 +972,10 @@
           <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 20px;">Hasta 50 agentes</div>
           <div style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 2;">
             &#10003; Todo de Starter<br/>
-            &#10003; Webhooks bidireccionales<br/>
-            &#10003; Prompt Engineering Lab<br/>
+            &#10003; Conexión con otras herramientas<br/>
+            &#10003; Editor de instrucciones para asistentes<br/>
             &#10003; 5 usuarios + roles<br/>
-            &#10003; API key management
+            &#10003; Control de accesos
           </div>
         </div>
         <div style="padding: 32px; border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
@@ -1002,31 +986,10 @@
           <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 20px;">Agentes ilimitados</div>
           <div style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 2;">
             &#10003; Todo de Business<br/>
-            &#10003; Multi-tenant completo<br/>
-            &#10003; Audit trail + compliance<br/>
-            &#10003; Deploy on-premise / VPC<br/>
+            &#10003; Múltiples organizaciones separadas<br/>
+            &#10003; Registro completo para auditorías<br/>
+            &#10003; Instalación en tu propio servidor<br/>
             &#10003; SLA 99.9% + soporte dedicado
-          </div>
-        </div>
-      </div>
-      <div style="margin-top: 48px; padding: 28px 32px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Unit Economics (proyectado)</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 24px;">
-          <div>
-            <div style="font-size: 24px; font-weight: 700; color: var(--primary-soft);">$8.50</div>
-            <div style="font-size: 12px; color: rgba(255,255,255,0.4);">Revenue por agente/mes (promedio)</div>
-          </div>
-          <div>
-            <div style="font-size: 24px; font-weight: 700; color: var(--success);">92%</div>
-            <div style="font-size: 12px; color: rgba(255,255,255,0.4);">Margen bruto (SaaS)</div>
-          </div>
-          <div>
-            <div style="font-size: 24px; font-weight: 700; color: var(--warning);">$1.2K</div>
-            <div style="font-size: 12px; color: rgba(255,255,255,0.4);">ARPU target (anual)</div>
-          </div>
-          <div>
-            <div style="font-size: 24px; font-weight: 700; color: var(--error);">&lt;6 mo</div>
-            <div style="font-size: 12px; color: rgba(255,255,255,0.4);">CAC payback period</div>
           </div>
         </div>
       </div>
@@ -1037,9 +1000,9 @@
   <section>
     <div class="container">
       <div class="section-label">Ventaja Competitiva</div>
-      <h2>No es otro builder de agentes.<br/>Es la capa de gestion.</h2>
+      <h2>No es otra herramienta para crear IA.<br/>Es para gestionarla.</h2>
       <p class="section-desc">
-        LangChain, CrewAI y n8n crean agentes. Nosotros los gestionamos. No competimos — nos integramos.
+        Otras plataformas te ayudan a crear asistentes de IA. Nosotros te ayudamos a gestionarlos. No competimos — nos integramos.
       </p>
       <div style="margin-top: 48px; overflow-x: auto;">
         <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px;">
@@ -1047,8 +1010,8 @@
             <tr>
               <th style="text-align: left; padding: 16px 20px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;">Capacidad</th>
               <th style="text-align: center; padding: 16px 20px; font-weight: 700; color: var(--primary); font-size: 13px;">CRM Agents</th>
-              <th style="text-align: center; padding: 16px 20px; font-weight: 500; color: var(--text-secondary); font-size: 13px;">LangChain / CrewAI</th>
-              <th style="text-align: center; padding: 16px 20px; font-weight: 500; color: var(--text-secondary); font-size: 13px;">n8n / Make</th>
+              <th style="text-align: center; padding: 16px 20px; font-weight: 500; color: var(--text-secondary); font-size: 13px;">Constructores de IA</th>
+              <th style="text-align: center; padding: 16px 20px; font-weight: 500; color: var(--text-secondary); font-size: 13px;">Automatización</th>
               <th style="text-align: center; padding: 16px 20px; font-weight: 500; color: var(--text-secondary); font-size: 13px;">Custom interno</th>
             </tr>
           </thead>
@@ -1070,7 +1033,7 @@
             </tr>
             <tr><td colspan="5" style="padding: 4px;"></td></tr>
             <tr class="neu-sm">
-              <td style="padding: 14px 20px; border-radius: 12px 0 0 12px;">Multi-tenant + RBAC</td>
+              <td style="padding: 14px 20px; border-radius: 12px 0 0 12px;">Múltiples equipos con permisos por rol</td>
               <td style="text-align: center; padding: 14px; color: var(--success); font-weight: 700;">&#10003;</td>
               <td style="text-align: center; padding: 14px; color: var(--error);">&#10007;</td>
               <td style="text-align: center; padding: 14px; color: var(--error);">&#10007;</td>
@@ -1078,7 +1041,7 @@
             </tr>
             <tr><td colspan="5" style="padding: 4px;"></td></tr>
             <tr class="neu-sm">
-              <td style="padding: 14px 20px; border-radius: 12px 0 0 12px;">Agentes internos + externos juntos</td>
+              <td style="padding: 14px 20px; border-radius: 12px 0 0 12px;">Asistentes propios y de terceros en un solo panel</td>
               <td style="text-align: center; padding: 14px; color: var(--success); font-weight: 700;">&#10003;</td>
               <td style="text-align: center; padding: 14px; color: var(--warning);">&#9679;</td>
               <td style="text-align: center; padding: 14px; color: var(--warning);">&#9679;</td>
@@ -1119,32 +1082,32 @@
         <div class="feature-card neu">
           <div class="feature-icon">&#129302;</div>
           <h3>Agentes internos y externos</h3>
-          <p>Crea agentes con Claude API o conecta agentes externos (n8n, LangChain, CrewAI) via webhook. Un solo panel para todos.</p>
+          <p>Crea asistentes de IA propios o conecta herramientas que ya usas. Todo desde un solo panel.</p>
         </div>
         <div class="feature-card neu">
           <div class="feature-icon">&#127970;</div>
           <h3>Estructura organizacional</h3>
-          <p>Departamentos, roles jerarquicos, supervisores. Organigrama completo que escala como una empresa real.</p>
+          <p>Departamentos, roles, supervisores. Un organigrama completo para tu equipo de IA, igual que en una empresa real.</p>
         </div>
         <div class="feature-card neu">
           <div class="feature-icon">&#9889;</div>
-          <h3>Ejecucion en tiempo real</h3>
-          <p>Asigna tareas, ejecuta con un click, recibe resultados via SSE. Kanban board con estados en vivo.</p>
+          <h3>Ejecución en tiempo real</h3>
+          <p>Asigna tareas, ejecútalas con un clic y recibe los resultados al instante. Panel de tareas con estado en vivo.</p>
         </div>
         <div class="feature-card neu">
           <div class="feature-icon">&#128202;</div>
-          <h3>Metricas y costos</h3>
-          <p>Tasa de exito, tokens consumidos, latencia promedio, costo por agente. Dashboard con KPIs en tiempo real.</p>
+          <h3>Métricas y costos</h3>
+          <p>Tasa de éxito, tiempo de respuesta, costo por asistente. Sabe exactamente cuánto te cuesta y cuánto rinde cada uno.</p>
         </div>
         <div class="feature-card neu">
           <div class="feature-icon">&#128268;</div>
-          <h3>Webhooks bidireccionales</h3>
-          <p>Despacha tareas a plataformas externas y recibe resultados via webhook callback. Roundtrip completo.</p>
+          <h3>Conexión con otras herramientas</h3>
+          <p>Envía tareas a plataformas externas y recibe los resultados de vuelta automáticamente. Comunicación completa en ambas direcciones.</p>
         </div>
         <div class="feature-card neu">
           <div class="feature-icon">&#128221;</div>
-          <h3>Prompt Engineering Lab</h3>
-          <p>Edita, versiona y compara system prompts. A/B testing de configuraciones para optimizar rendimiento.</p>
+          <h3>Editor de instrucciones</h3>
+          <p>Edita, versiona y compara las instrucciones de cada asistente. Prueba diferentes configuraciones y quédate con la que mejor funciona.</p>
         </div>
       </div>
     </div>
@@ -1153,54 +1116,34 @@
   <!-- ─── Architecture ─── -->
   <section id="architecture" style="background: var(--bg-dark); color: white;">
     <div class="container">
-      <div class="section-label" style="color: var(--primary-soft);">Arquitectura</div>
-      <h2 style="color: white;">Disenado para produccion</h2>
+      <div class="section-label" style="color: var(--primary-soft);">Infraestructura</div>
+      <h2 style="color: white;">Construido para durar</h2>
       <p style="color: rgba(255,255,255,0.5); max-width: 600px; line-height: 1.7;">
-        Stack moderno, full async, con separacion clara entre frontend, backend y agentes.
-        Cada dominio es auto-contenido: router &rarr; service &rarr; repository &rarr; models.
+        Una plataforma sólida que crece con tu empresa. Sin límites artificiales, sin tiempo de inactividad, sin sorpresas.
       </p>
       <div class="arch-flow">
         <div class="arch-node neu-dark">
-          <div class="label" style="color:rgba(255,255,255,0.4);">Frontend</div>
-          <div class="name" style="color:white;">React + Vite</div>
-          <div class="tech">TypeScript, TanStack Query, Zustand</div>
+          <div class="label" style="color:rgba(255,255,255,0.4);">&#9889;</div>
+          <div class="name" style="color:white;">Rápido</div>
+          <div class="tech">Resultados en segundos, sin esperas</div>
         </div>
         <div class="arch-arrow">&rarr;</div>
         <div class="arch-node neu-dark">
-          <div class="label" style="color:rgba(255,255,255,0.4);">API</div>
-          <div class="name" style="color:white;">FastAPI</div>
-          <div class="tech">async, Pydantic v2, SSE</div>
+          <div class="label" style="color:rgba(255,255,255,0.4);">&#128274;</div>
+          <div class="name" style="color:white;">Seguro</div>
+          <div class="tech">Accesos por rol, datos aislados por empresa</div>
         </div>
         <div class="arch-arrow">&rarr;</div>
         <div class="arch-node neu-dark">
-          <div class="label" style="color:rgba(255,255,255,0.4);">Engine</div>
-          <div class="name" style="color:white;">Agent Executor</div>
-          <div class="tech">Claude API, Unified Dispatcher</div>
+          <div class="label" style="color:rgba(255,255,255,0.4);">&#128200;</div>
+          <div class="name" style="color:white;">Escalable</div>
+          <div class="tech">De 5 a 500 asistentes sin cambiar nada</div>
         </div>
         <div class="arch-arrow">&rarr;</div>
         <div class="arch-node neu-dark">
-          <div class="label" style="color:rgba(255,255,255,0.4);">Storage</div>
-          <div class="name" style="color:white;">PostgreSQL 16</div>
-          <div class="tech">SQLAlchemy 2.0, Alembic</div>
-        </div>
-      </div>
-
-      <div style="display: flex; justify-content: center; gap: 40px; margin-top: 48px; flex-wrap: wrap;">
-        <div style="text-align: center;">
-          <div style="font-size: 14px; font-weight: 700; color: var(--primary-soft);">12</div>
-          <div style="font-size: 11px; color: rgba(255,255,255,0.4);">API Endpoints</div>
-        </div>
-        <div style="text-align: center;">
-          <div style="font-size: 14px; font-weight: 700; color: var(--primary-soft);">15+</div>
-          <div style="font-size: 11px; color: rgba(255,255,255,0.4);">DB Models</div>
-        </div>
-        <div style="text-align: center;">
-          <div style="font-size: 14px; font-weight: 700; color: var(--primary-soft);">SSE</div>
-          <div style="font-size: 11px; color: rgba(255,255,255,0.4);">Real-time Events</div>
-        </div>
-        <div style="text-align: center;">
-          <div style="font-size: 14px; font-weight: 700; color: var(--primary-soft);">100%</div>
-          <div style="font-size: 11px; color: rgba(255,255,255,0.4);">Async</div>
+          <div class="label" style="color:rgba(255,255,255,0.4);">&#127758;</div>
+          <div class="name" style="color:white;">Siempre disponible</div>
+          <div class="tech">SLA 99.9%, sin interrupciones</div>
         </div>
       </div>
     </div>
@@ -1233,18 +1176,18 @@
         </div>
         <div class="stack-card neu-sm">
           <div class="category">AI & Infrastructure</div>
-          <div class="stack-item"><div class="dot"></div><span>Claude API</span><span class="version">Anthropic</span></div>
+          <div class="stack-item"><div class="dot"></div><span>IA de Anthropic</span><span class="version">motor</span></div>
           <div class="stack-item"><div class="dot"></div><span>PostgreSQL</span><span class="version">16</span></div>
-          <div class="stack-item"><div class="dot"></div><span>SSE</span><span class="version">real-time</span></div>
-          <div class="stack-item"><div class="dot"></div><span>Webhooks</span><span class="version">bidirectional</span></div>
-          <div class="stack-item"><div class="dot"></div><span>Docker</span><span class="version">ready</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Actualizaciones en vivo</span><span class="version">real-time</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Conexiones externas</span><span class="version">bidireccional</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Docker</span><span class="version">listo</span></div>
         </div>
         <div class="stack-card neu-sm">
           <div class="category">Integraciones</div>
-          <div class="stack-item"><div class="dot"></div><span>n8n</span><span class="version">workflows</span></div>
-          <div class="stack-item"><div class="dot"></div><span>LangChain</span><span class="version">agents</span></div>
-          <div class="stack-item"><div class="dot"></div><span>CrewAI</span><span class="version">multi-agent</span></div>
-          <div class="stack-item"><div class="dot"></div><span>Custom SDK</span><span class="version">API key</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Automatizaciones externas</span><span class="version">flujos</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Asistentes de terceros</span><span class="version">conectados</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Equipos multi-agente</span><span class="version">coordinados</span></div>
+          <div class="stack-item"><div class="dot"></div><span>Cualquier herramienta</span><span class="version">personalizada</span></div>
         </div>
       </div>
     </div>
@@ -1296,24 +1239,24 @@
         <div class="roadmap-item">
           <div class="roadmap-marker done">&#10003;</div>
           <div class="roadmap-content">
-            <h4>Fase 2 — Ejecucion de Agentes</h4>
-            <p>Agent Executor con Claude API. Unified Dispatcher para agentes internos/externos. Webhook roundtrip completo.</p>
+            <h4>Fase 2 — Ejecucion de Asistentes</h4>
+            <p>Motor de ejecución de tareas con IA. Soporte para asistentes propios y externos. Comunicación bidireccional completa.</p>
             <span class="tag tag-done">Completado</span>
           </div>
         </div>
         <div class="roadmap-item">
           <div class="roadmap-marker done">&#10003;</div>
           <div class="roadmap-content">
-            <h4>Fase 3 — Real-time & UI</h4>
-            <p>Server-Sent Events, notificaciones toast, Kanban board, modal de resultados, metricas dashboard.</p>
+            <h4>Fase 3 — Tiempo real & Interfaz</h4>
+            <p>Actualizaciones en vivo, notificaciones instantáneas, tablero Kanban de tareas, panel de métricas y resultados.</p>
             <span class="tag tag-done">Completado</span>
           </div>
         </div>
         <div class="roadmap-item">
           <div class="roadmap-marker done">&#10003;</div>
           <div class="roadmap-content">
-            <h4>Fase 4 — Multi-tenant & Auth</h4>
-            <p>Autenticacion JWT (access + refresh tokens), multi-tenancy con org_id en todas las queries, login/registro con neumorphic UI, permisos por rol (owner/admin/member/viewer).</p>
+            <h4>Fase 4 — Empresas múltiples & Accesos</h4>
+            <p>Inicio de sesión seguro, soporte para múltiples organizaciones con datos separados, registro de usuarios y permisos por rol (dueño, administrador, miembro, observador).</p>
             <span class="tag tag-done">Completado</span>
           </div>
         </div>
@@ -1337,14 +1280,132 @@
     </div>
   </section>
 
+  <!-- ─── Inversión ─── -->
+  <section id="inversion" style="background: var(--bg-dark); color: white;">
+    <div class="container">
+      <div class="section-label" style="color: var(--primary-soft);">La Oportunidad</div>
+      <h2 style="color: white;">Únete en la etapa<br/>donde más crece el valor</h2>
+      <p style="color: rgba(255,255,255,0.5); max-width: 620px; line-height: 1.7; margin-bottom: 48px;">
+        Estamos abriendo una ronda de inversión inicial para dedicar tiempo completo al producto,
+        llegar al primer cliente pagador y construir la base de crecimiento.
+      </p>
+
+      <!-- La propuesta -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; margin-bottom: 48px;">
+
+        <div style="padding: 36px; border-radius: 20px; background: rgba(99,102,241,0.12); border: 2px solid rgba(99,102,241,0.35);">
+          <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--primary-soft); font-weight: 600; margin-bottom: 20px;">La propuesta</div>
+          <div style="font-size: 42px; font-weight: 800; color: white; margin-bottom: 4px;">$70,000 <span style="font-size: 20px; color: rgba(255,255,255,0.4);">USD</span></div>
+          <div style="font-size: 16px; color: var(--primary-soft); font-weight: 600; margin-bottom: 24px;">a cambio del 20% de la empresa</div>
+          <div style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 2.2;">
+            &#10003;&nbsp; Son dueños reales de un % de la empresa<br/>
+            &#10003;&nbsp; Su dinero crece con el negocio — sin plazos que los limiten<br/>
+            &#10003;&nbsp; Cada cliente nuevo aumenta el valor de su participación<br/>
+            &#10003;&nbsp; Reporte mensual de avances y resultados<br/>
+            &#10003;&nbsp; Voz y voto en las decisiones importantes
+          </div>
+        </div>
+
+        <div style="padding: 36px; border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); font-weight: 600; margin-bottom: 20px;">Para qué es el dinero</div>
+          <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <div>
+                <span style="font-size: 14px; color: rgba(255,255,255,0.7);">Marketing y adquisición de clientes</span>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px;">Ads, demos, eventos, primeras ventas</div>
+              </div>
+              <span style="font-size: 14px; font-weight: 600; color: white;">$40,000</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <div>
+                <span style="font-size: 14px; color: rgba(255,255,255,0.7);">Salario fundador (12 meses)</span>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px;">Dedicación completa al producto y clientes</div>
+              </div>
+              <span style="font-size: 14px; font-weight: 600; color: white;">$20,000</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: 14px; color: rgba(255,255,255,0.7);">Infraestructura y herramientas</span>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px;">Servidores, APIs de IA, software</div>
+              </div>
+              <span style="font-size: 14px; font-weight: 600; color: white;">$10,000</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Escenarios -->
+      <div style="margin-bottom: 48px;">
+        <div style="font-size: 13px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 20px;">
+          ¿Cuánto puede valer su participación? — Proyecciones a 18 meses
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+
+          <div style="padding: 24px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); text-align: center;">
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">Conservador</div>
+            <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 8px;">20 clientes · $4K/mes</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 16px;">Empresa: ~$240K</div>
+            <div style="font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.6);">~$48K</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px;">valor del 20%</div>
+          </div>
+
+          <div style="padding: 24px; border-radius: 16px; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); text-align: center; position: relative;">
+            <div style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); padding: 3px 12px; border-radius: 6px; background: linear-gradient(135deg, var(--primary), #4f46e5); font-size: 10px; font-weight: 600; color: white; white-space: nowrap;">Más probable</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">Realista</div>
+            <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 8px;">50 clientes · $10K/mes</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 16px;">Empresa: ~$600K</div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--primary-soft);">~$120K</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px;">valor del 20%</div>
+          </div>
+
+          <div style="padding: 24px; border-radius: 16px; background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.2); text-align: center;">
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">Optimista</div>
+            <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 8px;">100 clientes · $20K/mes</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 16px;">Empresa: ~$1.2M</div>
+            <div style="font-size: 24px; font-weight: 700; color: var(--success);">~$240K</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px;">valor del 20%</div>
+          </div>
+
+        </div>
+        <div style="margin-top: 16px; padding: 14px 20px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+          <p style="font-size: 12px; color: rgba(255,255,255,0.3); line-height: 1.6; margin: 0;">
+            ⚠️ Estas son proyecciones, no garantías. Como toda inversión en una empresa nueva, existe el riesgo de pérdida total del capital. Invierta solo lo que está dispuesto a comprometer a largo plazo.
+          </p>
+        </div>
+      </div>
+
+      <!-- Validación -->
+      <div style="padding: 28px 32px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); font-weight: 600; margin-bottom: 16px;">Por qué ahora y no después</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
+          <div>
+            <div style="font-size: 20px; margin-bottom: 8px;">&#127970;</div>
+            <div style="font-size: 13px; font-weight: 600; color: white; margin-bottom: 4px;">HDI Seguros ya dijo que sí</div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6;">Validación directa de una aseguradora de escala nacional. El primer cliente ya existe, falta cerrar el contrato.</div>
+          </div>
+          <div>
+            <div style="font-size: 20px; margin-bottom: 8px;">&#9989;</div>
+            <div style="font-size: 13px; font-weight: 600; color: white; margin-bottom: 4px;">El producto ya funciona</div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6;">No es una idea ni un prototipo. Hay un sistema completo funcionando hoy. El dinero es para vender, no para construir.</div>
+          </div>
+          <div>
+            <div style="font-size: 20px; margin-bottom: 8px;">&#128200;</div>
+            <div style="font-size: 13px; font-weight: 600; color: white; margin-bottom: 4px;">Entrar hoy es el mejor precio</div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6;">En etapa inicial el 20% cuesta $70K. Con el primer cliente pagador, ese mismo porcentaje costará 3-5x más.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
   <!-- ─── CTA ─── -->
   <section class="cta">
     <div class="container">
       <div class="section-label">Siguiente Paso</div>
-      <h2>Listo para ver el futuro<br/>de la gestion de agentes IA?</h2>
+      <h2>Listo para ver cómo funciona<br/>en la práctica?</h2>
       <p class="section-desc" style="margin: 0 auto 40px; text-align: center;">
-        El MVP esta funcionando. Cada agente ejecuta tareas reales con Claude API.
-        Los resultados aparecen en tiempo real. Esto no es un mockup.
+        La plataforma está funcionando. Cada asistente ejecuta tareas reales y los resultados aparecen al instante. Esto no es una maqueta.
       </p>
       <div class="cta-actions">
         <a href="http://localhost:5173" class="btn-primary" target="_blank">
