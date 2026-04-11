@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["node_modules.nosync/.bin/vite", "--port", "5173"],
+      "cwd": "frontend",
+      "port": 5173
+    },
+    {
+      "name": "Backend (FastAPI)",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["/tmp/start_backend.sh"],
+      "port": 8000
+    },
+    {
+      "name": "PostgreSQL (Docker)",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "postgres"],
+      "port": 5432
+    },
+    {
+      "name": "Landing Page",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["/tmp/serve_pitch.sh"],
+      "port": 8080
+    }
+  ]
+}
