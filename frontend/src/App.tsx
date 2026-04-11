@@ -19,6 +19,7 @@ const DepartmentListPage = lazy(() => import("./features/departments/DepartmentL
 const DepartmentDetailPage = lazy(() => import("./features/departments/DepartmentDetailPage"));
 const TaskListPage = lazy(() => import("./features/tasks/TaskListPage"));
 const CreateTaskPage = lazy(() => import("./features/tasks/CreateTaskPage"));
+const TaskDetailPage = lazy(() => import("./features/tasks/TaskDetailPage"));
 const ActivityLogPage = lazy(() => import("./features/activities/ActivityLogPage"));
 const MetricsDashboardPage = lazy(() => import("./features/metrics/MetricsDashboardPage"));
 const InteractionMapPage = lazy(() => import("./features/interactions/InteractionMapPage"));
@@ -26,6 +27,7 @@ const ImprovementsPage = lazy(() => import("./features/improvements/Improvements
 const PromptEngineeringPage = lazy(() => import("./features/prompts/PromptEngineeringPage"));
 const IntegrationsPage = lazy(() => import("./features/integrations/IntegrationsPage"));
 const KnowledgePage = lazy(() => import("./features/knowledge/KnowledgePage"));
+const CredentialsPage = lazy(() => import("./features/credentials/CredentialsPage"));
 
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize);
@@ -54,6 +56,7 @@ export default function App() {
             <Route path="departments/:id" element={<ErrorBoundary section="Detalle de Departamento"><DepartmentDetailPage /></ErrorBoundary>} />
             <Route path="tasks" element={<ErrorBoundary section="Tareas"><TaskListPage /></ErrorBoundary>} />
             <Route path="tasks/new" element={<ErrorBoundary section="Crear Tarea"><CreateTaskPage /></ErrorBoundary>} />
+            <Route path="tasks/:id" element={<ErrorBoundary section="Detalle de Tarea"><TaskDetailPage /></ErrorBoundary>} />
             <Route path="ceo" element={<ErrorBoundary section="CEO Dashboard"><CeoDashboardPage /></ErrorBoundary>} />
             <Route path="activities" element={<ErrorBoundary section="Actividades"><ActivityLogPage /></ErrorBoundary>} />
             <Route path="metrics" element={<ErrorBoundary section="Metricas"><MetricsDashboardPage /></ErrorBoundary>} />
@@ -62,6 +65,7 @@ export default function App() {
             <Route path="prompts" element={<ErrorBoundary section="Prompts"><PromptEngineeringPage /></ErrorBoundary>} />
             <Route path="integrations" element={<ErrorBoundary section="Integraciones"><IntegrationsPage /></ErrorBoundary>} />
             <Route path="knowledge" element={<ErrorBoundary section="Conocimiento"><KnowledgePage /></ErrorBoundary>} />
+            <Route path="credentials" element={<ErrorBoundary section="Credenciales"><CredentialsPage /></ErrorBoundary>} />
           </Route>
         </Route>
       </Routes>

@@ -6,7 +6,6 @@ import { useExecuteTask } from "@/hooks/useTasks";
 import { useToastStore } from "@/stores/toastStore";
 import StatusBadge from "@/components/common/StatusBadge";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
-import TaskDetailModal from "./TaskDetailModal";
 import { TASK_STATUS_COLORS, PRIORITY_COLORS } from "@/lib/constants";
 import { formatRelative } from "@/lib/formatters";
 import { Play, Loader2, Eye, Plus, LayoutGrid, Table } from "lucide-react";
@@ -23,7 +22,6 @@ const KANBAN_COLUMNS = [
 export default function TaskListPage() {
   const navigate = useNavigate();
   const [view, setView] = useState<"kanban" | "table">("kanban");
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const addToast = useToastStore((s) => s.addToast);
 
   const { data, isLoading } = useQuery({
@@ -119,7 +117,7 @@ export default function TaskListPage() {
                         executeMutation.variables === task.id
                       }
                       onExecute={handleExecute}
-                      onClick={() => setSelectedTaskId(task.id)}
+                      onClick={() => navigate(`/tasks/${task.id}`)}
                     />
                   ))}
                 </div>
@@ -164,7 +162,7 @@ export default function TaskListPage() {
                   <tr
                     key={task.id}
                     className="hover:bg-white/30 cursor-pointer transition-colors"
-                    onClick={() => setSelectedTaskId(task.id)}
+                    onClick={() => navigate(`/tasks/${task.id}`)}
                   >
                     <td className="px-5 py-3.5 font-medium text-[var(--text-primary)]">
                       {task.title}
@@ -192,7 +190,7 @@ export default function TaskListPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedTaskId(task.id);
+                            navigate(`/tasks/${task.id}`);
                           }}
                           className="p-2 rounded-lg neu-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                           title="Ver detalle"
@@ -227,12 +225,6 @@ export default function TaskListPage() {
         </div>
       )}
 
-      {selectedTaskId && (
-        <TaskDetailModal
-          taskId={selectedTaskId}
-          onClose={() => setSelectedTaskId(null)}
-        />
-      )}
     </div>
   );
 }

@@ -19,4 +19,5 @@ export const ROUTES = {
   PROMPTS: "/prompts",
   INTEGRATIONS: "/integrations",
   KNOWLEDGE: "/knowledge",
+  CREDENTIALS: "/credentials",
 } as const;

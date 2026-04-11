@@ -234,3 +234,48 @@ Registro de decisiones técnicas y de arquitectura. Cada entrada documenta qué 
 - $10,000 — Infraestructura y herramientas (14%)
 
 **Por qué este mix:** El producto ya está construido. El cuello de botella es tracción, no desarrollo. Invertir en marketing primero maximiza el tiempo que el fundador tiene para cerrar los primeros clientes antes de que se agote el capital.
+
+---
+
+## [2026-04-11] Fase 2: TaskDetailPage como full-page vs modal
+
+**Contexto:** Las tareas con resultados ricos (delegación con subtareas, KB citations, token usage) no caben bien en el TaskDetailModal existente. Necesitamos visualizar árboles de delegación, sparklines de KB sources, y el output del supervisor.
+
+**Decisión:** Crear un nuevo `TaskDetailPage` como ruta `/tasks/:id` y cambiar el click de tareas en la lista para navegar a esta página en lugar de abrir el modal. El modal se mantiene como archivo (TaskDetailModal.tsx) pero ya no se usa desde TaskListPage.
+
+**Alternativas consideradas:**
+- Expandir el modal con scroll → demasiado contenido, UX pobre en móvil
+- Tab layout dentro del modal → complejidad sin ganancia, la delegación tree necesita espacio
+- Drawer lateral → buen UX pero requiere más trabajo CSS y no permite URL directa
+
+**Riesgos/Limitaciones:** La página hace 2 queries (task + subtasks) y auto-polls mientras está in_progress. El refetchInterval de 3s puede ser agresivo si hay muchos usuarios simultáneos.
+
+---
+
+## [2026-04-11] Credenciales: secret_value write-only, preview solo últimos 4 chars
+
+**Contexto:** Los agentes necesitan API keys para herramientas externas (MCP). Necesitamos un módulo de credenciales con CRUD, pero los secretos no deben exponerse vía la API.
+
+**Decisión:** El campo `secret_value` se acepta en Create/Update pero NUNCA se incluye en la respuesta API. Solo se devuelve `secret_preview` (****xxxx). El worker que ejecuta tareas lee el secreto directamente del DB cuando lo necesita. No hay encryption at-application-level — se confía en PostgreSQL encryption at rest.
+
+**Alternativas consideradas:**
+- Encryption con Fernet/AES en el backend → más seguro, pero agrega complejidad (key management, rotation). Para MVP es overengineering.
+- Vault externo (HashiCorp Vault, AWS Secrets Manager) → ideal en producción, excesivo para demo.
+- Guardar solo un hash → no podemos usar el secreto si solo tenemos el hash.
+
+**Riesgos/Limitaciones:** Sin encryption at-application-level, un dump de DB expone todos los secretos. Aceptable para demo, no para producción. El upgrade path es claro: agregar Fernet encryption en el service layer sin cambiar la API.
+
+---
+
+## [2026-04-11] Score sparkline SVG nativo sin librería de charts
+
+**Contexto:** La página de Prompt Engineering necesita mostrar la evolución del performance_score a través de versiones (v1: 6.2 → v2: 7.8 → v3: 9.1) de forma visual.
+
+**Decisión:** SVG inline con `<polyline>`, `<polygon>` (fill), y `<circle>` (dots). No se usa Recharts ni ninguna librería de charts adicional. El componente `ScoreEvolutionChart` calcula posiciones con funciones `toX`/`toY` sobre un viewBox fijo de 280x60.
+
+**Alternativas consideradas:**
+- Recharts (ya en el bundle para MetricsDashboard) → overkill para 3 puntos, agrega API surface innecesaria
+- CSS bar chart → no muestra la tendencia tan claramente como una línea
+- Sparkline library (react-sparklines) → dependency extra para algo que son 40 líneas de SVG
+
+**Riesgos/Limitaciones:** No tiene tooltips interactivos (hover). Para 3-5 puntos no se necesitan. Si escala a muchas versiones (>10), necesitaría scroll horizontal o downsample.

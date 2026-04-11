@@ -15,6 +15,7 @@ import {
   Wand2,
   Plug,
   BookOpen,
+  Key,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -33,6 +34,7 @@ const navItems = [
   { path: ROUTES.PROMPTS, label: "Prompts", Icon: Wand2 },
   { path: ROUTES.INTEGRATIONS, label: "Integraciones", Icon: Plug },
   { path: ROUTES.KNOWLEDGE, label: "Conocimiento", Icon: BookOpen },
+  { path: ROUTES.CREDENTIALS, label: "Credenciales", Icon: Key },
 ];
 
 export default function Sidebar() {

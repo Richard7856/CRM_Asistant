@@ -8,9 +8,10 @@ import StatusBadge from "@/components/common/StatusBadge";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import { formatDateTime, formatDate, formatRelative } from "@/lib/formatters";
 import { LOG_LEVEL_COLORS, TASK_STATUS_COLORS, PRIORITY_COLORS } from "@/lib/constants";
-import { ArrowLeft, Copy, Check, Power } from "lucide-react";
+import { useAgentCredentials } from "@/hooks/useCredentials";
+import { ArrowLeft, Copy, Check, Power, Wrench, Key, Shield, ShieldOff, Server } from "lucide-react";
 
-type Tab = "overview" | "activity" | "tasks" | "subordinates";
+type Tab = "overview" | "activity" | "tasks" | "tools" | "subordinates";
 
 export default function AgentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,14 +43,23 @@ export default function AgentDetailPage() {
     enabled: !!id && activeTab === "tasks",
   });
 
+  const { data: agentCredentials } = useAgentCredentials(
+    activeTab === "tools" ? id : undefined
+  );
+
   if (isLoading || !agent) return <LoadingSpinner />;
 
   const hasSubordinates = (subordinates?.length ?? 0) > 0;
+
+  const tools = agent.definition?.tools ?? [];
+  const credCount = agentCredentials?.length ?? 0;
+  const hasTools = tools.length > 0 || credCount > 0 || agent.origin === "internal";
 
   const tabs: { key: Tab; label: string; hidden?: boolean }[] = [
     { key: "overview", label: "Overview" },
     { key: "activity", label: "Actividad" },
     { key: "tasks", label: "Tareas" },
+    { key: "tools", label: "Herramientas", hidden: !hasTools },
     { key: "subordinates", label: "Subordinados", hidden: !hasSubordinates },
   ];
 
@@ -425,6 +435,108 @@ export default function AgentDetailPage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* TOOLS TAB — agent tools + credentials */}
+      {activeTab === "tools" && (
+        <div className="space-y-5">
+          {/* Tools from definition */}
+          {tools.length > 0 && (
+            <div className="neu-flat p-5 rounded-xl">
+              <div className="flex items-center gap-2 mb-4">
+                <Wrench className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                  Herramientas Configuradas
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {tools.map((tool, idx) => {
+                  const toolName = typeof tool === "string"
+                    ? tool
+                    : (tool as Record<string, unknown>).name
+                      ? String((tool as Record<string, unknown>).name)
+                      : `Tool ${idx + 1}`;
+                  const toolDesc = typeof tool !== "string" && (tool as Record<string, unknown>).description
+                    ? String((tool as Record<string, unknown>).description)
+                    : null;
+                  return (
+                    <div key={idx} className="neu-pressed rounded-lg p-3">
+                      <p className="text-sm font-medium text-indigo-500">{toolName}</p>
+                      {toolDesc && (
+                        <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">{toolDesc}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {tools.length === 0 && (
+            <div className="neu-flat p-5 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <Wrench className="w-4 h-4 text-[var(--text-muted)]" />
+                <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                  Herramientas
+                </h2>
+              </div>
+              <p className="text-sm text-[var(--text-muted)]">
+                Este agente no tiene herramientas configuradas aún. Las herramientas MCP se pueden asignar desde Integraciones.
+              </p>
+            </div>
+          )}
+
+          {/* Credentials available to this agent */}
+          <div className="neu-flat p-5 rounded-xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Key className="w-4 h-4 text-amber-500" />
+              <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                Credenciales Disponibles
+              </h2>
+              <span className="ml-auto text-[11px] text-[var(--text-muted)]">
+                {credCount} {credCount === 1 ? "credencial" : "credenciales"}
+              </span>
+            </div>
+            {credCount === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                Sin credenciales asignadas. Puedes crear credenciales desde la sección{" "}
+                <Link to="/credentials" className="text-indigo-500 hover:text-indigo-600 font-medium">
+                  Credenciales
+                </Link>
+                .
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {agentCredentials!.map((cred) => (
+                  <div key={cred.id} className="neu-pressed rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-1.5 rounded-lg ${cred.is_active ? "bg-emerald-50" : "bg-gray-100"}`}>
+                        {cred.is_active ? (
+                          <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <ShieldOff className="w-3.5 h-3.5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">{cred.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Server className="w-3 h-3 text-[var(--text-muted)]" />
+                          <span className="text-[11px] text-[var(--text-muted)]">{cred.service_name}</span>
+                          <code className="text-[11px] font-mono text-[var(--text-muted)]">{cred.secret_preview}</code>
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      cred.agent_id ? "bg-indigo-50 text-indigo-600" : "bg-gray-100 text-[var(--text-muted)]"
+                    }`}>
+                      {cred.agent_id ? "Asignada" : "Compartida"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

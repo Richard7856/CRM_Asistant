@@ -22,6 +22,7 @@ from app.auth.router import router as auth_router
 from app.prompts.router import router as prompts_router
 from app.events.router import router as events_router
 from app.knowledge.router import router as knowledge_router
+from app.credentials.router import router as credentials_router
 
 # Import background workers — Phase 5: metrics aggregation + agent monitoring
 from app.workers.metrics_calculator import run_metrics_calculator
@@ -101,6 +102,7 @@ app.include_router(improvements_router, prefix=f"{prefix}/improvements", tags=["
 app.include_router(integrations_router, prefix=f"{prefix}/integrations", tags=["integrations"], dependencies=_auth)
 app.include_router(prompts_router, prefix=f"{prefix}/prompts", tags=["prompts"], dependencies=_auth)
 app.include_router(knowledge_router, prefix=f"{prefix}/knowledge", tags=["knowledge"], dependencies=_auth)
+app.include_router(credentials_router, prefix=f"{prefix}/credentials", tags=["credentials"], dependencies=_auth)
 
 
 @app.get("/health")
