@@ -9,6 +9,7 @@ Pipeline: assigned → in_progress → completed/failed
 Each step creates an ActivityLog entry for full visibility.
 """
 
+import asyncio
 import logging
 import time
 import uuid
@@ -18,6 +19,13 @@ import anthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+# Retry config for Claude API calls.
+# Retries on overload (529), rate limit (429), and transient server errors (500+).
+# Backoff: 1s → 2s → 4s — total max wait ~7s before giving up.
+_MAX_RETRIES = 3
+_BASE_BACKOFF_SECONDS = 1.0
+_API_TIMEOUT_SECONDS = 90  # hard cap — if Claude hasn't responded in 90s, fail the task
 
 from app.activities.models import ActivityLog, LogLevel
 from app.agents.models import Agent, AgentOrigin, AgentStatus
@@ -152,9 +160,81 @@ async def execute_task(task_id: uuid.UUID, db: AsyncSession) -> Task:
     return task
 
 
+async def execute_task_background(task_id: uuid.UUID) -> None:
+    """
+    Execute a task in a background coroutine with its own DB session.
+
+    Called via asyncio.create_task() from the router so the HTTP request
+    returns immediately (202). The result reaches the frontend through
+    the SSE EventBus — no polling needed.
+
+    Each background execution opens and closes its own session to avoid
+    sharing the request's session (which closes when the endpoint returns).
+    """
+    from app.core.database import async_session_factory
+
+    async with async_session_factory() as db:
+        try:
+            await execute_task(task_id, db)
+        except Exception as exc:
+            # execute_task already logs errors and emits SSE events internally,
+            # but if something fails BEFORE it gets to the agent routing
+            # (e.g. task not found, no agent assigned) we catch it here
+            # so the background task doesn't crash silently.
+            logger.error("Background execution failed for task %s: %s", task_id, exc)
+            await _emit("task.failed", {
+                "task_id": str(task_id),
+                "error": str(exc)[:200],
+            })
+
+
 # ------------------------------------------------------------------
 # Internal agent execution (Claude API)
 # ------------------------------------------------------------------
+
+
+async def _call_claude_with_retry(
+    client: anthropic.AsyncAnthropic,
+    **kwargs,
+) -> anthropic.types.Message:
+    """
+    Call Claude API with retry + timeout protection.
+
+    Retries on transient errors (overload 529, rate limit 429, server 500+).
+    Non-retryable errors (400 bad request, 401 auth) fail immediately.
+    Hard timeout of 90s per attempt — if Claude hangs, we don't hang with it.
+    """
+    last_exc: Exception | None = None
+
+    for attempt in range(_MAX_RETRIES):
+        try:
+            return await asyncio.wait_for(
+                client.messages.create(**kwargs),
+                timeout=_API_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            last_exc = TimeoutError(
+                f"Claude API did not respond within {_API_TIMEOUT_SECONDS}s (attempt {attempt + 1}/{_MAX_RETRIES})"
+            )
+            logger.warning("Claude API timeout on attempt %d/%d", attempt + 1, _MAX_RETRIES)
+        except anthropic.RateLimitError as exc:
+            last_exc = exc
+            logger.warning("Claude API rate limited (429) on attempt %d/%d", attempt + 1, _MAX_RETRIES)
+        except anthropic.InternalServerError as exc:
+            # Covers 500 and 529 (overloaded)
+            last_exc = exc
+            logger.warning("Claude API server error on attempt %d/%d: %s", attempt + 1, _MAX_RETRIES, exc)
+        except anthropic.APIError as exc:
+            # Non-retryable API errors (400, 401, 403) — fail immediately
+            raise
+
+        # Exponential backoff: 1s, 2s, 4s
+        if attempt < _MAX_RETRIES - 1:
+            backoff = _BASE_BACKOFF_SECONDS * (2 ** attempt)
+            logger.info("Retrying Claude API in %.1fs...", backoff)
+            await asyncio.sleep(backoff)
+
+    raise last_exc or RuntimeError("Claude API failed after all retries")
 
 
 async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
@@ -215,7 +295,8 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
                 rag_chunks_found, task.id, agent.name,
             )
 
-        response = await client.messages.create(
+        response = await _call_claude_with_retry(
+            client,
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,

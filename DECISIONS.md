@@ -19,7 +19,52 @@ Registro de decisiones técnicas y de arquitectura. Cada entrada documenta qué 
 - Con más de ~15 tareas realmente concurrentes, el pool de conexiones a PostgreSQL (`pool_size=10, max_overflow=20` = 30 total) se agota y las siguientes tareas empiezan a esperar en cola.
 - **No apto para producción con >15 tareas concurrentes simultáneas.**
 
-**Mejora pendiente:** Migrar a `BackgroundTasks` o `asyncio.create_task()` para que el endpoint retorne inmediatamente y el resultado llegue vía SSE. Prioridad ALTA antes del primer cliente con carga real.
+> **RESUELTO en [2026-04] — ver entrada abajo.**
+
+---
+
+## [2026-04] Migración a ejecución asíncrona en background (fix concurrencia)
+
+**Contexto:** El endpoint `POST /tasks/{id}/execute` bloqueaba el HTTP request 10-60s mientras Claude respondía. Con 50 tareas concurrentes, el event loop se saturaba y el pool de DB se agotaba.
+
+**Decisión:** Tres cambios:
+1. El endpoint ahora retorna **202 Accepted** inmediatamente — valida que la tarea y el agente existan, y lanza la ejecución con `asyncio.create_task()`.
+2. `execute_task_background()` (nueva función en `agent_executor.py`) abre **su propia sesión de DB** vía `async_session_factory()` — no reutiliza la del request HTTP que ya cerró.
+3. El resultado llega al frontend por **SSE** (eventos `task.completed` / `task.failed` que ya existían).
+
+**Por qué `asyncio.create_task()` y no `BackgroundTasks` de FastAPI:**
+`BackgroundTasks` ejecuta las tareas secuencialmente después de enviar la respuesta. `asyncio.create_task()` lanza coroutines verdaderamente concurrentes — 50 tareas corren en paralelo real, cada una esperando I/O de Claude API sin bloquear a las otras.
+
+**Alternativas consideradas:**
+- Redis + Celery worker separado — máxima robustez (persistencia de cola, reintentos automáticos, monitoreo con Flower), pero agrega 2 servicios a la infra. Innecesario mientras el tráfico quepa en un solo proceso uvicorn.
+- `BackgroundTasks` de FastAPI — más simple pero secuencial, no resuelve el problema de concurrencia real.
+
+**Riesgos/Limitaciones:**
+- Si uvicorn muere, las tareas en vuelo se pierden (no hay cola persistente). Aceptable para MVP — las tareas quedan en `IN_PROGRESS` y el operador puede re-ejecutar.
+- Con 50+ tareas en paralelo, el pool de DB (30 conexiones) puede saturarse si cada tarea tiene muchas operaciones DB. Monitorear y subir si es necesario.
+
+**Archivos modificados:** `tasks/router.py`, `workers/agent_executor.py`
+
+---
+
+## [2026-04] Retry con backoff exponencial + timeout para Claude API
+
+**Contexto:** La llamada a Claude API no tenía protección contra fallos transitorios (rate limit 429, sobrecarga 529, server errors 500+) ni timeout — si Claude colgaba, la tarea colgaba para siempre.
+
+**Decisión:** Nueva función `_call_claude_with_retry()` en `agent_executor.py`:
+- **Retry**: máximo 3 intentos con backoff exponencial (1s → 2s → 4s) para errores retryables (429, 500, 529).
+- **Timeout**: 90 segundos por intento vía `asyncio.wait_for()`. Si Claude no responde, se cancela la coroutine y se reintenta.
+- **Fail-fast**: errores no retryables (400 bad request, 401 auth) fallan inmediatamente sin reintentar.
+
+**Alternativas consideradas:**
+- Biblioteca `tenacity` — retry genérico con decoradores. Agrega una dependencia para algo que se resuelve en 25 líneas.
+- Timeout solo en el cliente httpx de Anthropic — no cubre la lógica de retry ni distingue entre errores retryables y permanentes.
+
+**Riesgos/Limitaciones:**
+- 3 retries × 90s timeout = peor caso ~4.5 minutos antes de declarar una tarea como FAILED. Aceptable para tareas batch, podría ser largo para UX interactiva.
+- Si Claude está caído sistémicamente (no solo transitory), cada tarea va a hacer 3 intentos antes de fallar. Con 50 tareas = 150 llamadas fallidas. No es un problema real (son async, no bloquean nada) pero genera muchos logs.
+
+**Archivo modificado:** `workers/agent_executor.py`
 
 ---
 

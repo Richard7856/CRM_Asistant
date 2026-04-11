@@ -1,15 +1,17 @@
+import asyncio
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.database import get_db
 from app.core.pagination import PaginatedResponse, PaginationParams
-from app.tasks.models import TaskPriority, TaskStatus
+from app.tasks.models import Task, TaskPriority, TaskStatus
 from app.tasks.schemas import TaskAssign, TaskCreate, TaskResponse, TaskUpdate
 from app.auth.dependencies import get_org_id
 from app.tasks.service import TaskService
-from app.workers.agent_executor import execute_task
+from app.workers.agent_executor import execute_task_background
+from app.agents.models import Agent
 
 router = APIRouter()
 
@@ -78,13 +80,42 @@ async def assign_task(
     return await service.assign_task(task_id, data.agent_id)
 
 
-@router.post("/{task_id}/execute", response_model=TaskResponse)
+@router.post("/{task_id}/execute", response_model=TaskResponse, status_code=202)
 async def execute_task_endpoint(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    """Execute a task using its assigned agent's LLM config (Claude API)."""
-    task = await execute_task(task_id, db)
+    """
+    Launch task execution in background — returns 202 immediately.
+
+    The actual result arrives via SSE (event types: task.completed / task.failed).
+    This lets the frontend fire 50 executions without blocking; each one
+    runs as an independent asyncio coroutine with its own DB session.
+    """
+    # Validate task exists and has an assigned agent BEFORE launching background work.
+    # This way the client gets a clear 404/400 immediately instead of a silent SSE error.
+    result = await db.execute(
+        select(Task).where(Task.id == task_id)
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    if task.assigned_to is None:
+        raise HTTPException(status_code=400, detail="Task has no assigned agent")
+
+    # Verify agent exists
+    agent_result = await db.execute(
+        select(Agent).where(Agent.id == task.assigned_to)
+    )
+    if agent_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="Assigned agent not found")
+
+    # Launch execution in background — does NOT block this response
+    asyncio.create_task(
+        execute_task_background(task_id),
+        name=f"exec-task-{task_id}",
+    )
+
     return TaskResponse.model_validate(task)
 
 
