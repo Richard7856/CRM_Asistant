@@ -304,3 +304,85 @@ Registro de decisiones técnicas y de arquitectura. Cada entrada documenta qué 
 **Decisión:** Reemplazo masivo con equivalentes CSS variable: `text-gray-900` → `text-[var(--text-primary)]`, `bg-gray-100` → `bg-[var(--neu-dark)]/10`, etc. Se preservó `bg-gray-900` para fondos de terminal/código (debe ser oscuro en ambos modos).
 
 **Riesgos/Limitaciones:** Los valores no son 1:1 idénticos (ej: `text-gray-500` = `#6b7280`, `--text-muted` = `#a0aec0` en light). La diferencia es sutil y el resultado visual es más coherente con el design system general.
+
+---
+
+## [2026-04-12] Phase 4: Herramientas autónomas via Claude tool_use loop (no Agent SDK)
+
+**Contexto:** Los agentes CEO/Admin necesitan poder crear departamentos, otros agentes, system prompts, y asignar tareas autónomamente — sin intervención humana. Esto requiere un loop de herramientas dentro del executor.
+
+**Decisión:** Implementar un loop de `tool_use` directamente en `agent_executor.py`:
+1. Si el agente tiene herramientas configuradas, se pasan como `tools=[]` al llamar a Claude
+2. Si Claude responde con bloques `tool_use`, se ejecutan vía `tool_registry.execute_tool()`, se construyen `tool_result` messages, y se reenvían a Claude
+3. El loop continúa hasta que Claude responda con `end_turn` o se alcancen 10 iteraciones
+
+El registry usa un patrón `@register_tool("name")` que registra handlers en un dict global. Cada handler recibe un `ToolContext` (db session, org_id, calling agent info) y el input dict.
+
+**Alternativas consideradas:**
+- Claude Agent SDK — abstracción de alto nivel que maneja el loop automáticamente. Pero agrega una dependencia pesada y no permite control granular sobre permisos, rate limiting, y logging por herramienta.
+- LangChain tools — framework completo con tool abstraction. Overhead excesivo, difícil de debuggear, y no necesitamos la complejidad de chains.
+- Endpoints REST internos (el agente llama a su propia API) — elegante pero circular y difícil de rastrear en logs.
+
+**Riesgos/Limitaciones:**
+- El loop máximo de 10 iteraciones puede ser insuficiente para tareas complejas con muchos pasos.
+- Las herramientas se ejecutan en el mismo proceso y event loop que el API server. Una herramienta que tarde mucho bloquea la tarea pero no el server (es async).
+- El rate limiting es in-memory — se pierde si el proceso se reinicia. Aceptable para MVP.
+
+---
+
+## [2026-04-12] Rate limiting y hard limits para creación autónoma de recursos
+
+**Contexto:** Sin límites, un agente con un prompt mal diseñado podría crear cientos de departamentos o agentes en un loop infinito, agotando recursos del DB.
+
+**Decisión:** Tres capas de protección:
+1. **Hard limits:** Máximo 20 departamentos por organización, máximo 15 agentes por departamento. Validados en cada handler de creación.
+2. **Rate limiting:** Máximo 3 llamadas a herramientas de creación por agente por hora. Tracking in-memory con window de 1 hora.
+3. **Role-based permissions:** CEO/Admin accede a las 6 herramientas. Supervisor accede a 5 (no puede crear departamentos). Agent solo accede a 2 (read-only: listar departamentos y agentes).
+
+**Alternativas consideradas:**
+- Redis para rate limiting — más robusto (persiste entre reinicios), pero agrega dependencia. El tracking in-memory es suficiente para MVP.
+- Límites configurables por organización — más flexible pero agrega complejidad en la UI de configuración. Los valores hardcoded (20/15/3) son razonables para el caso de uso.
+
+**Riesgos/Limitaciones:**
+- Los hard limits son globales, no configurables por org. Algunas organizaciones grandes podrían necesitar más de 20 departamentos.
+- El rate limit in-memory no sobrevive reinicios del proceso.
+
+---
+
+## [2026-04-12] Provenance tracking: quién creó qué agente y por qué
+
+**Contexto:** Cuando un agente CEO crea otro agente autónomamente, necesitamos saber quién lo creó y por qué — para auditoría, debugging, y para que el humano pueda revisar las decisiones del CEO.
+
+**Decisión:** Dos columnas nuevas en la tabla `agents`:
+- `created_by_agent_id` (FK a agents.id, nullable) — NULL si fue creado por un humano
+- `creation_reason` (Text, nullable) — la razón que el agente dio para crear este recurso
+
+El frontend muestra esta info en el `AgentLifecycleCard`: "Creado por [Agent Name]" con link al agente creador, o "Creado manualmente" si es NULL.
+
+**Alternativas consideradas:**
+- Tabla de auditoría separada (audit_log) — más completo pero requiere joins para mostrar info básica.
+- Campo `metadata` JSONB existente — ya existe en agents, pero mezclar provenance con otros metadatos dificulta queries.
+
+**Riesgos/Limitaciones:**
+- El `created_by_agent_id` FK crea una segunda relación self-referential en la tabla agents (la primera es `supervisor_id`). SQLAlchemy necesita `foreign_keys=` explícito en todas las relaciones self-referential cuando hay múltiples FKs.
+
+---
+
+## [2026-04-12] Lifecycle monitor como 4to background worker (no cron externo)
+
+**Contexto:** Necesitamos detectar agentes que llevan mucho tiempo sin completar tareas (idle) para notificar al humano. La detección debe ser periódica pero no en tiempo real.
+
+**Decisión:** Un 4to background worker (`lifecycle_monitor.py`) que corre cada 24 horas dentro del mismo proceso FastAPI:
+- Busca agentes con `last_task_completed_at` > 7 días atrás, O agentes creados hace > 3 días con `total_tasks_completed = 0`
+- Crea una notificación de tipo `AGENT_IDLE` para cada uno
+- Emite evento SSE `agent.idle_detected`
+- **Nunca desactiva automáticamente** — solo notifica al humano para que decida
+
+**Alternativas consideradas:**
+- Cron job externo — más robusto (sobrevive reinicios) pero agrega complejidad de infraestructura
+- Trigger en la base de datos — evaluaría en cada INSERT/UPDATE a tasks, overhead constante vs evaluación batch cada 24h
+- Desactivación automática de agentes idle — demasiado agresivo, un agente podría estar idle por diseño (ej: un agente de emergencias)
+
+**Riesgos/Limitaciones:**
+- Si el proceso se reinicia, el timer se resetea y la próxima evaluación ocurre 24h después del reinicio.
+- La detección no es deduplicada entre reinicios — pero sí evita spam chequeando si ya existe una notificación idle no leída para ese agente.
