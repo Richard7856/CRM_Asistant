@@ -279,3 +279,28 @@ Registro de decisiones técnicas y de arquitectura. Cada entrada documenta qué 
 - Sparkline library (react-sparklines) → dependency extra para algo que son 40 líneas de SVG
 
 **Riesgos/Limitaciones:** No tiene tooltips interactivos (hover). Para 3-5 puntos no se necesitan. Si escala a muchas versiones (>10), necesitaría scroll horizontal o downsample.
+
+---
+
+## [2026-04-11] Dark mode via CSS variable remapping + class toggle
+
+**Contexto:** El design system neumórfico usa CSS custom properties (`--neu-bg`, `--neu-dark`, `--text-primary`, etc.) para todas las superficies y textos. Necesitamos dark mode para el demo y para profesionalismo general.
+
+**Decisión:** Agregar un bloque `html.dark { }` en `index.css` que re-mapea TODAS las variables CSS a valores oscuros. Los utility classes neumórficos (`.neu-flat`, `.neu-sm`, `.neu-pressed`) automáticamente usan los nuevos valores sin ningún cambio en componentes. Toggle via clase en `<html>`, persistida en localStorage, con detección de preferencia del OS como fallback.
+
+**Alternativas consideradas:**
+- Tailwind `dark:` prefix en cada clase → requiere duplicar CADA clase en CADA componente. Con 15+ páginas, imposible de mantener.
+- CSS media query `prefers-color-scheme` sin toggle → no permite al usuario elegir manualmente
+- Separate CSS file para dark → duplicación, difícil de mantener sincronizado
+
+**Riesgos/Limitaciones:** Algunos colores semánticos (indigo-50, emerald-50 para badges de status) no se adaptan automáticamente al dark mode. Son aceptables porque son colores de acento con suficiente contraste. En producción se podría agregar un `html.dark .bg-indigo-50 { background: ... }` override.
+
+---
+
+## [2026-04-11] Color consistency pass: eliminar hardcoded Tailwind grays
+
+**Contexto:** 134 instancias de colores hardcoded (`text-gray-500`, `bg-gray-100`, `border-gray-300`) en 10 feature files. Estos no responden al dark mode porque son valores absolutos de Tailwind, no CSS variables.
+
+**Decisión:** Reemplazo masivo con equivalentes CSS variable: `text-gray-900` → `text-[var(--text-primary)]`, `bg-gray-100` → `bg-[var(--neu-dark)]/10`, etc. Se preservó `bg-gray-900` para fondos de terminal/código (debe ser oscuro en ambos modos).
+
+**Riesgos/Limitaciones:** Los valores no son 1:1 idénticos (ej: `text-gray-500` = `#6b7280`, `--text-muted` = `#a0aec0` en light). La diferencia es sutil y el resultado visual es más coherente con el design system general.
