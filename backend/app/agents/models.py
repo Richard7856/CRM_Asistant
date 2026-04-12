@@ -109,12 +109,31 @@ class Agent(Base):
     )
     last_heartbeat_at: Mapped[datetime | None] = mapped_column()
 
+    # Lifecycle tracking — populated by agent_executor on task completion
+    # and by create_agent tool for autonomous agent creation provenance
+    last_task_completed_at: Mapped[datetime | None] = mapped_column()
+    total_tasks_completed: Mapped[int] = mapped_column(Integer, default=0)
+    created_by_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True
+    )
+    creation_reason: Mapped[str | None] = mapped_column(Text)
+
     # Relationships
     organization = relationship("Organization", foreign_keys=[organization_id])
     role = relationship("Role", back_populates="agents")
     department = relationship("Department", back_populates="agents", foreign_keys=[department_id])
-    supervisor = relationship("Agent", remote_side="Agent.id", back_populates="subordinates")
-    subordinates = relationship("Agent", back_populates="supervisor")
+    supervisor = relationship(
+        "Agent", remote_side="Agent.id", back_populates="subordinates",
+        foreign_keys=[supervisor_id],
+    )
+    subordinates = relationship(
+        "Agent", back_populates="supervisor",
+        foreign_keys="Agent.supervisor_id",
+    )
+    creator_agent = relationship(
+        "Agent", remote_side="Agent.id",
+        foreign_keys=[created_by_agent_id],
+    )
     integration = relationship(
         "AgentIntegration", back_populates="agent", uselist=False, cascade="all, delete-orphan"
     )

@@ -10,6 +10,7 @@ import { formatDateTime, formatDate, formatRelative } from "@/lib/formatters";
 import { LOG_LEVEL_COLORS, TASK_STATUS_COLORS, PRIORITY_COLORS } from "@/lib/constants";
 import { useAgentCredentials } from "@/hooks/useCredentials";
 import { ArrowLeft, Copy, Check, Power, Wrench, Key, Shield, ShieldOff, Server } from "lucide-react";
+import AgentLifecycleCard from "./AgentLifecycleCard";
 
 type Tab = "overview" | "activity" | "tasks" | "tools" | "subordinates";
 
@@ -164,6 +165,7 @@ export default function AgentDetailPage() {
       {/* OVERVIEW */}
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
           <div className="neu-flat p-5 space-y-4">
             <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
               Informacion Basica
@@ -204,6 +206,9 @@ export default function AgentDetailPage() {
                 value={agent.last_heartbeat_at ? formatRelative(agent.last_heartbeat_at) : "N/A"}
               />
             </div>
+          </div>
+
+          <AgentLifecycleCard agent={agent} />
           </div>
 
           <div className="space-y-6">

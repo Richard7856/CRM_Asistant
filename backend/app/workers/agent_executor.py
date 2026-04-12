@@ -10,6 +10,7 @@ Each step creates an ActivityLog entry for full visibility.
 """
 
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -28,10 +29,15 @@ _BASE_BACKOFF_SECONDS = 1.0
 _API_TIMEOUT_SECONDS = 90  # hard cap — if Claude hasn't responded in 90s, fail the task
 
 from app.activities.models import ActivityLog, LogLevel
-from app.agents.models import Agent, AgentOrigin, AgentStatus
+from app.agents.models import Agent, AgentOrigin, AgentStatus, RoleLevel
 from app.config import settings
 from app.core.events import Event, event_bus
 from app.tasks.models import Task, TaskStatus
+from app.workers.tool_definitions import get_tools_for_role
+from app.workers.tool_registry import ToolContext, execute_tool
+
+# Import tools package so all @register_tool handlers are registered at startup
+import app.workers.tools  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -146,12 +152,13 @@ async def execute_task(task_id: uuid.UUID, db: AsyncSession) -> Task:
     if task.assigned_to is None:
         raise ValueError(f"Task {task_id} has no assigned agent")
 
-    # Load agent with definition + integration (need both to decide route)
+    # Load agent with definition + integration + role (need all to decide route and tool permissions)
     agent_result = await db.execute(
         select(Agent)
         .options(
             selectinload(Agent.definition),
             selectinload(Agent.integration),
+            selectinload(Agent.role),
         )
         .where(Agent.id == task.assigned_to)
     )
@@ -305,18 +312,80 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
                 rag_chunks_found, task.id, agent.name,
             )
 
-        response = await _call_claude_with_retry(
-            client,
+        # Resolve tools for this agent — only if definition.tools has entries
+        agent_tools = _resolve_agent_tools(agent)
+        messages = [{"role": "user", "content": user_message}]
+        claude_kwargs = dict(
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
+            messages=messages,
         )
+        if agent_tools:
+            claude_kwargs["tools"] = agent_tools
+
+        # Total token tracking across all loop iterations
+        total_input_tokens = 0
+        total_output_tokens = 0
+        tool_calls_log = []  # record of every tool invocation for activity log
+
+        # ── Tool loop: call Claude, execute tools, repeat until end_turn ──
+        # Max 10 iterations to prevent infinite loops (each iteration = 1 Claude call)
+        _MAX_TOOL_ITERATIONS = 10
+
+        for iteration in range(_MAX_TOOL_ITERATIONS):
+            response = await _call_claude_with_retry(client, **claude_kwargs)
+
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
+
+            # If no tools or Claude didn't call any tools, we're done
+            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+            if not tool_use_blocks or not agent_tools:
+                break
+
+            # Execute each tool Claude requested and build tool_result messages
+            tool_results_content = []
+            for tool_block in tool_use_blocks:
+                tool_result = await _execute_agent_tool(
+                    tool_name=tool_block.name,
+                    tool_input=tool_block.input,
+                    agent=agent,
+                    task=task,
+                    db=db,
+                )
+                tool_calls_log.append({
+                    "tool": tool_block.name,
+                    "input": tool_block.input,
+                    "result": tool_result,
+                    "iteration": iteration + 1,
+                })
+                tool_results_content.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_block.id,
+                    "content": json.dumps(tool_result, default=str),
+                })
+
+            # Append Claude's response + our tool results to the conversation
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results_content})
+
+            # Update kwargs with extended conversation
+            claude_kwargs["messages"] = messages
+
+            # If Claude's stop_reason is "end_turn", it chose to stop after tools
+            if response.stop_reason == "end_turn":
+                break
+        else:
+            logger.warning(
+                "Agent %s hit max tool iterations (%d) for task %s",
+                agent.name, _MAX_TOOL_ITERATIONS, task.id,
+            )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
 
-        # Extract the text response
+        # Extract the final text response from the last Claude message
         output_text = ""
         for block in response.content:
             if block.type == "text":
@@ -329,30 +398,39 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
             "output": output_text,
             "model": response.model,
             "usage": {
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
             },
             "elapsed_ms": elapsed_ms,
             "stop_reason": response.stop_reason,
             "kb_sources": rag_sources,
         }
+        if tool_calls_log:
+            task.result["tool_calls"] = tool_calls_log
 
         agent.status = AgentStatus.ACTIVE
         agent.last_heartbeat_at = datetime.utcnow()
+        # Lifecycle tracking — update task completion stats for idle detection
+        agent.last_task_completed_at = datetime.utcnow()
+        agent.total_tasks_completed = (agent.total_tasks_completed or 0) + 1
         await db.flush()
+
+        total_tokens = total_input_tokens + total_output_tokens
 
         await _log_activity(
             db, agent.id, task.id,
             action="task_completed",
             level=LogLevel.INFO,
-            summary=f"Tarea completada en {elapsed_ms}ms — {response.usage.input_tokens + response.usage.output_tokens} tokens",
+            summary=f"Tarea completada en {elapsed_ms}ms — {total_tokens} tokens"
+                    + (f", {len(tool_calls_log)} tool calls" if tool_calls_log else ""),
             details={
                 "elapsed_ms": elapsed_ms,
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
                 "model": response.model,
                 "stop_reason": response.stop_reason,
                 "rag_chunks_retrieved": rag_chunks_found,
+                "tool_calls_count": len(tool_calls_log),
             },
             organization_id=agent.organization_id,
         )
@@ -361,13 +439,13 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
             "task_id": str(task.id), "title": task.title,
             "agent_id": str(agent.id), "agent_name": agent.name,
             "elapsed_ms": elapsed_ms,
-            "tokens": response.usage.input_tokens + response.usage.output_tokens,
+            "tokens": total_tokens,
+            "tool_calls": len(tool_calls_log),
         })
 
         logger.info(
-            "Task %s completed by agent %s in %dms (%d tokens)",
-            task.id, agent.name, elapsed_ms,
-            response.usage.input_tokens + response.usage.output_tokens,
+            "Task %s completed by agent %s in %dms (%d tokens, %d tool calls)",
+            task.id, agent.name, elapsed_ms, total_tokens, len(tool_calls_log),
         )
 
     except Exception as e:
@@ -516,6 +594,103 @@ async def _execute_external(task: Task, agent: Agent, db: AsyncSession) -> None:
             organization_id=agent.organization_id,
         )
         logger.error("Task %s dispatch error for agent %s: %s", task.id, agent.name, e)
+
+
+# ------------------------------------------------------------------
+# Tool helpers — resolve definitions and dispatch to registry
+# ------------------------------------------------------------------
+
+
+def _resolve_agent_tools(agent: Agent) -> list[dict]:
+    """
+    Build the tools list for a Claude API call based on the agent's config.
+
+    If the agent's definition.tools contains tool names (e.g. ["create_department", "create_agent"]),
+    resolve them to full Anthropic-format schemas. If the agent has a role, also filter
+    by role permissions to prevent privilege escalation.
+
+    Returns empty list if agent has no tools configured — the executor
+    will skip the tool loop and behave exactly as before.
+    """
+    definition = agent.definition
+    if not definition or not definition.tools:
+        return []
+
+    tool_names = definition.tools  # list of tool name strings stored in JSONB
+    if not isinstance(tool_names, list) or not tool_names:
+        return []
+
+    from app.workers.tool_definitions import ALL_TOOLS, get_tools_for_role
+
+    # Determine the agent's role level for permission filtering
+    role_level = RoleLevel.AGENT  # default — most restrictive
+    if agent.role and hasattr(agent.role, "level"):
+        role_level = agent.role.level
+
+    allowed_tools = get_tools_for_role(role_level)
+    allowed_names = {t["name"] for t in allowed_tools}
+
+    resolved = []
+    for name in tool_names:
+        if name in ALL_TOOLS and name in allowed_names:
+            resolved.append(ALL_TOOLS[name])
+        else:
+            logger.warning(
+                "Agent %s requested tool '%s' but it's not available for role %s",
+                agent.name, name, role_level.value,
+            )
+
+    return resolved
+
+
+async def _execute_agent_tool(
+    tool_name: str,
+    tool_input: dict,
+    agent: Agent,
+    task: Task,
+    db: AsyncSession,
+) -> dict:
+    """
+    Execute a tool call from Claude via the tool registry.
+
+    Builds a ToolContext with the agent's scope and permissions,
+    then delegates to the registry. Logs the tool invocation.
+    """
+    role_level = RoleLevel.AGENT
+    if agent.role and hasattr(agent.role, "level"):
+        role_level = agent.role.level
+
+    ctx = ToolContext(
+        db=db,
+        org_id=agent.organization_id,
+        calling_agent_id=agent.id,
+        calling_agent_role=role_level,
+        calling_agent_department_id=agent.department_id,
+        calling_agent_name=agent.name,
+        task_id=task.id,
+    )
+
+    result = await execute_tool(tool_name, tool_input, ctx)
+
+    # Log the autonomous action for audit trail
+    await _log_activity(
+        db, agent.id, task.id,
+        action=f"tool_used:{tool_name}",
+        level=LogLevel.INFO,
+        summary=f"Herramienta autónoma: {tool_name}",
+        details={"tool_input": tool_input, "tool_result": result},
+        organization_id=agent.organization_id,
+    )
+
+    await _emit("agent.tool_used", {
+        "agent_id": str(agent.id),
+        "agent_name": agent.name,
+        "task_id": str(task.id),
+        "tool_name": tool_name,
+        "success": "error" not in result,
+    })
+
+    return result
 
 
 # ------------------------------------------------------------------

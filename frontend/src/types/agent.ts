@@ -31,6 +31,11 @@ export interface Agent {
   created_at: string;
   updated_at: string;
   last_heartbeat_at: string | null;
+  // Lifecycle fields
+  last_task_completed_at: string | null;
+  total_tasks_completed: number;
+  created_by_agent_id: string | null;
+  creation_reason: string | null;
   // Joined fields
   role_name?: string;
   department_name?: string;

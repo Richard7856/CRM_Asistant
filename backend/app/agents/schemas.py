@@ -108,6 +108,12 @@ class AgentResponse(BaseModel):
     updated_at: datetime
     last_heartbeat_at: datetime | None = None
 
+    # Lifecycle tracking
+    last_task_completed_at: datetime | None = None
+    total_tasks_completed: int = 0
+    created_by_agent_id: uuid.UUID | None = None
+    creation_reason: str | None = None
+
     # Resolved names (populated by service layer)
     role_name: str | None = None
     department_name: str | None = None

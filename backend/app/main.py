@@ -23,11 +23,13 @@ from app.prompts.router import router as prompts_router
 from app.events.router import router as events_router
 from app.knowledge.router import router as knowledge_router
 from app.credentials.router import router as credentials_router
+from app.notifications.router import router as notifications_router
 
-# Import background workers — Phase 5: metrics aggregation + agent monitoring
+# Import background workers
 from app.workers.metrics_calculator import run_metrics_calculator
 from app.workers.heartbeat_monitor import run_monitor as run_heartbeat_monitor
 from app.workers.integration_health_checker import run_health_checker
+from app.workers.lifecycle_monitor import run_lifecycle_monitor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,6 +54,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(
             run_health_checker(interval=300),  # check integration health every 5 minutes
             name="integration_health_checker",
+        ),
+        asyncio.create_task(
+            run_lifecycle_monitor(interval_seconds=86400),  # check idle agents every 24h
+            name="lifecycle_monitor",
         ),
     ]
     logger.info("Started %d background workers", len(worker_tasks))
@@ -103,6 +109,7 @@ app.include_router(integrations_router, prefix=f"{prefix}/integrations", tags=["
 app.include_router(prompts_router, prefix=f"{prefix}/prompts", tags=["prompts"], dependencies=_auth)
 app.include_router(knowledge_router, prefix=f"{prefix}/knowledge", tags=["knowledge"], dependencies=_auth)
 app.include_router(credentials_router, prefix=f"{prefix}/credentials", tags=["credentials"], dependencies=_auth)
+app.include_router(notifications_router, prefix=f"{prefix}/notifications", tags=["notifications"], dependencies=_auth)
 
 
 @app.get("/health")

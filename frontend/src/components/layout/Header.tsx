@@ -4,9 +4,10 @@
  */
 
 import { useState } from "react";
-import { Search, Bell, LogOut, ChevronDown, Sun, Moon } from "lucide-react";
+import { Search, LogOut, ChevronDown, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
+import NotificationPanel from "@/features/notifications/NotificationPanel";
 
 /** Get uppercase initials from a name (e.g. "Richard Figueroa" → "RF") */
 function getInitials(name: string): string {
@@ -55,9 +56,7 @@ export default function Header() {
           )}
         </button>
 
-        <button className="neu-sm p-2.5 hover:shadow-none transition-shadow duration-200 active:shadow-[inset_3px_3px_6px_0_var(--neu-dark),inset_-3px_-3px_6px_0_var(--neu-light)]">
-          <Bell className="w-4 h-4 text-[var(--text-secondary)]" />
-        </button>
+        <NotificationPanel />
 
         {/* User badge with dropdown */}
         <div className="relative">
