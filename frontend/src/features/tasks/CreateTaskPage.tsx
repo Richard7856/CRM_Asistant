@@ -66,18 +66,18 @@ export default function CreateTaskPage() {
     navigate("/tasks");
   };
 
-  const labelClass = "block text-sm font-medium text-gray-700 mb-1";
+  const labelClass = "block text-sm font-medium text-[var(--text-secondary)] mb-1";
   const inputClass =
-    "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none";
+    "w-full rounded-lg border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none";
   const errorClass = "text-xs text-red-500 mt-1";
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Nueva Tarea</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Nueva Tarea</h1>
         <button
           onClick={() => navigate("/tasks")}
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
         >
           Cancelar
         </button>
@@ -179,7 +179,7 @@ export default function CreateTaskPage() {
           <button
             type="button"
             onClick={() => navigate("/tasks")}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[var(--neu-dark)]/10 rounded-lg hover:bg-[var(--neu-dark)]/20"
           >
             Cancelar
           </button>

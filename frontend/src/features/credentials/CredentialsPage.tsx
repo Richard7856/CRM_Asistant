@@ -213,8 +213,8 @@ function CredentialCard({
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`p-1.5 rounded-lg ${cred.is_active ? "bg-indigo-50" : "bg-gray-100"}`}>
-            <Key className={`w-4 h-4 ${cred.is_active ? "text-indigo-500" : "text-gray-400"}`} />
+          <div className={`p-1.5 rounded-lg ${cred.is_active ? "bg-indigo-50" : "bg-[var(--neu-dark)]/10"}`}>
+            <Key className={`w-4 h-4 ${cred.is_active ? "text-indigo-500" : "text-[var(--text-muted)]"}`} />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
@@ -234,7 +234,7 @@ function CredentialCard({
             {cred.is_active ? (
               <Shield className="w-3.5 h-3.5 text-emerald-500" />
             ) : (
-              <ShieldOff className="w-3.5 h-3.5 text-gray-400" />
+              <ShieldOff className="w-3.5 h-3.5 text-[var(--text-muted)]" />
             )}
           </button>
           <button

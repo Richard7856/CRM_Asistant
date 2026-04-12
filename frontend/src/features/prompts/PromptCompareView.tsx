@@ -56,14 +56,14 @@ export default function PromptCompareView({ agentId, v1, v2, onClose }: PromptCo
     return (
       <div className="neu-flat rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
             Comparacion: v{v1} vs v{v2}
           </h3>
-          <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
+          <button onClick={onClose} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
             Cerrar
           </button>
         </div>
-        <p className="text-sm text-gray-500">Las versiones son identicas. No hay diferencias.</p>
+        <p className="text-sm text-[var(--text-muted)]">Las versiones son identicas. No hay diferencias.</p>
       </div>
     );
   }
@@ -74,12 +74,12 @@ export default function PromptCompareView({ agentId, v1, v2, onClose }: PromptCo
   return (
     <div className="neu-flat rounded-xl p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">
           Comparacion: v{data.version_a} vs v{data.version_b}
         </h3>
         <button
           onClick={onClose}
-          className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+          className="px-3 py-1.5 text-sm text-[var(--text-secondary)] bg-[var(--neu-dark)]/10 rounded-md hover:bg-[var(--neu-dark)]/20"
         >
           Cerrar
         </button>
@@ -88,10 +88,10 @@ export default function PromptCompareView({ agentId, v1, v2, onClose }: PromptCo
       {/* System prompt diff */}
       {promptDiff && (
         <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">System Prompt</h4>
+          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">System Prompt</h4>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-xs font-medium text-gray-500 mb-1 px-2">
+              <div className="text-xs font-medium text-[var(--text-muted)] mb-1 px-2">
                 Version {data.version_a}
               </div>
               <div className="bg-gray-900 rounded-lg p-3 font-mono text-xs max-h-96 overflow-y-auto">
@@ -125,7 +125,7 @@ export default function PromptCompareView({ agentId, v1, v2, onClose }: PromptCo
               </div>
             </div>
             <div>
-              <div className="text-xs font-medium text-gray-500 mb-1 px-2">
+              <div className="text-xs font-medium text-[var(--text-muted)] mb-1 px-2">
                 Version {data.version_b}
               </div>
               <div className="bg-gray-900 rounded-lg p-3 font-mono text-xs max-h-96 overflow-y-auto">
@@ -165,26 +165,26 @@ export default function PromptCompareView({ agentId, v1, v2, onClose }: PromptCo
       {/* Other field diffs */}
       {otherDiffs.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">
+          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">
             Diferencias de configuracion
           </h4>
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="neu-pressed-sm">
                 <tr>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">Campo</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">
+                  <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">Campo</th>
+                  <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">
                     v{data.version_a}
                   </th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">
+                  <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">
                     v{data.version_b}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--neu-dark)]/10">
                 {otherDiffs.map((diff) => (
                   <tr key={diff.field}>
-                    <td className="px-4 py-2 font-medium text-gray-700">
+                    <td className="px-4 py-2 font-medium text-[var(--text-secondary)]">
                       {FIELD_LABELS[diff.field] ?? diff.field}
                     </td>
                     <td className="px-4 py-2 text-red-600 bg-red-50">

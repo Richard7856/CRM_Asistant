@@ -4,8 +4,9 @@
  */
 
 import { useState } from "react";
-import { Search, Bell, LogOut, ChevronDown } from "lucide-react";
+import { Search, Bell, LogOut, ChevronDown, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { useUIStore } from "@/stores/uiStore";
 
 /** Get uppercase initials from a name (e.g. "Richard Figueroa" → "RF") */
 function getInitials(name: string): string {
@@ -24,6 +25,7 @@ function capitalize(s: string): string {
 
 export default function Header() {
   const { user, logout } = useAuthStore();
+  const { theme, toggleTheme } = useUIStore();
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -40,6 +42,19 @@ export default function Header() {
 
       {/* Right section */}
       <div className="flex items-center gap-4">
+        {/* Theme toggle — smooth icon swap with rotation */}
+        <button
+          onClick={toggleTheme}
+          className="neu-sm p-2.5 hover:shadow-none transition-all duration-300 active:shadow-[inset_3px_3px_6px_0_var(--neu-dark),inset_-3px_-3px_6px_0_var(--neu-light)]"
+          title={theme === "light" ? "Modo oscuro" : "Modo claro"}
+        >
+          {theme === "light" ? (
+            <Moon className="w-4 h-4 text-[var(--text-secondary)] transition-transform duration-300 hover:rotate-[-20deg]" />
+          ) : (
+            <Sun className="w-4 h-4 text-amber-400 transition-transform duration-300 hover:rotate-[20deg]" />
+          )}
+        </button>
+
         <button className="neu-sm p-2.5 hover:shadow-none transition-shadow duration-200 active:shadow-[inset_3px_3px_6px_0_var(--neu-dark),inset_-3px_-3px_6px_0_var(--neu-light)]">
           <Bell className="w-4 h-4 text-[var(--text-secondary)]" />
         </button>

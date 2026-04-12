@@ -371,14 +371,14 @@ export default function AgentDetailPage() {
                           ? "bg-amber-400 dot-glow-yellow"
                           : log.level === "info"
                             ? "bg-blue-400 dot-glow-blue"
-                            : "bg-gray-300 dot-glow-gray"
+                            : "bg-[var(--text-muted)] dot-glow-gray"
                     }`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[var(--text-primary)]">{log.action}</span>
-                        <span className={`text-xs font-medium capitalize ${LOG_LEVEL_COLORS[log.level] ?? "text-gray-400"}`}>
+                        <span className={`text-xs font-medium capitalize ${LOG_LEVEL_COLORS[log.level] ?? "text-[var(--text-muted)]"}`}>
                           {log.level}
                         </span>
                       </div>
@@ -511,11 +511,11 @@ export default function AgentDetailPage() {
                 {agentCredentials!.map((cred) => (
                   <div key={cred.id} className="neu-pressed rounded-lg p-3 flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`p-1.5 rounded-lg ${cred.is_active ? "bg-emerald-50" : "bg-gray-100"}`}>
+                      <div className={`p-1.5 rounded-lg ${cred.is_active ? "bg-emerald-50" : "bg-[var(--neu-dark)]/10"}`}>
                         {cred.is_active ? (
                           <Shield className="w-3.5 h-3.5 text-emerald-500" />
                         ) : (
-                          <ShieldOff className="w-3.5 h-3.5 text-gray-400" />
+                          <ShieldOff className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                         )}
                       </div>
                       <div className="min-w-0">
@@ -528,7 +528,7 @@ export default function AgentDetailPage() {
                       </div>
                     </div>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                      cred.agent_id ? "bg-indigo-50 text-indigo-600" : "bg-gray-100 text-[var(--text-muted)]"
+                      cred.agent_id ? "bg-indigo-50 text-indigo-600" : "bg-[var(--neu-dark)]/10 text-[var(--text-muted)]"
                     }`}>
                       {cred.agent_id ? "Asignada" : "Compartida"}
                     </span>

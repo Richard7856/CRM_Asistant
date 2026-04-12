@@ -110,7 +110,7 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
         <>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                 Nombre
               </label>
               <input
@@ -118,17 +118,17 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                 Categoria
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -139,18 +139,18 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Descripcion
             </label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Tags (separados por coma)
             </label>
             <input
@@ -158,7 +158,7 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
               value={tagsText}
               onChange={(e) => setTagsText(e.target.value)}
               placeholder="ej: chatbot, email, crm"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </>
@@ -167,10 +167,10 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
       {/* System Prompt */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-[var(--text-secondary)]">
             System Prompt
           </label>
-          <span className="text-xs text-gray-400">{charCount} caracteres</span>
+          <span className="text-xs text-[var(--text-muted)]">{charCount} caracteres</span>
         </div>
         <textarea
           value={systemPrompt}
@@ -185,13 +185,13 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
       {/* Model config */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Proveedor del modelo
           </label>
           <select
             value={modelProvider}
             onChange={(e) => setModelProvider(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             {PROVIDERS.map((p) => (
               <option key={p.value} value={p.value}>
@@ -201,7 +201,7 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Nombre del modelo
           </label>
           <input
@@ -209,14 +209,14 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
             value={modelName}
             onChange={(e) => setModelName(e.target.value)}
             placeholder="ej: gpt-4o, claude-3-opus"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Temperatura: {temperature.toFixed(2)}
           </label>
           <input
@@ -228,13 +228,13 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
             onChange={(e) => setTemperature(parseFloat(e.target.value))}
             className="w-full accent-indigo-600"
           />
-          <div className="flex justify-between text-xs text-gray-400">
+          <div className="flex justify-between text-xs text-[var(--text-muted)]">
             <span>0 (preciso)</span>
             <span>1 (creativo)</span>
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Max Tokens
           </label>
           <input
@@ -243,14 +243,14 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
             max={200000}
             value={maxTokens}
             onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       </div>
 
       {/* Tools */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
           Tools (JSON)
         </label>
         <textarea
@@ -264,7 +264,7 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
       {/* Change notes for versions */}
       {mode === "version" && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Notas del cambio
           </label>
           <input
@@ -272,7 +272,7 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
             value={changeNotes}
             onChange={(e) => setChangeNotes(e.target.value)}
             placeholder="Describe los cambios realizados..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       )}
@@ -289,7 +289,7 @@ export default function PromptEditor({ mode, initial, onSave, onCancel, saving }
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 neu-sm border border-[var(--neu-dark)] rounded-md hover:bg-[var(--neu-dark)]/20"
+          className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] neu-sm border border-[var(--neu-dark)] rounded-md hover:bg-[var(--neu-dark)]/20"
         >
           Cancelar
         </button>

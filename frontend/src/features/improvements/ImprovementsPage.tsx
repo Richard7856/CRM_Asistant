@@ -24,7 +24,7 @@ export default function ImprovementsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Puntos de Mejora</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)]">Puntos de Mejora</h1>
 
       <div className="space-y-3">
         {(data?.items ?? []).map((item) => (
@@ -32,14 +32,14 @@ export default function ImprovementsPage() {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-sm font-semibold">{item.title}</h3>
-                <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{item.description}</p>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={item.priority} colorMap={PRIORITY_COLORS} />
                 <StatusBadge status={item.status} colorMap={IMPROVEMENT_STATUS_COLORS} />
               </div>
             </div>
-            <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+            <div className="flex items-center gap-4 mt-3 text-xs text-[var(--text-muted)]">
               <span>Agente: {item.agent_name ?? "--"}</span>
               <span>Categoria: {item.category}</span>
               <span>{formatRelative(item.created_at)}</span>

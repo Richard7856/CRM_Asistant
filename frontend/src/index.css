@@ -39,6 +39,44 @@
   --text-primary: #2d3748;
   --text-secondary: #718096;
   --text-muted: #a0aec0;
+
+  /* Transition for theme switch */
+  --theme-transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ─── Dark Mode ───
+   Activated by adding .dark class to <html>.
+   Remaps all surface/shadow/text variables to dark palette.
+   The neumorphic utility classes (.neu-flat, .neu-sm, etc.) automatically
+   pick up the new values — no class changes needed on components.
+*/
+html.dark {
+  --neu-bg: #2d3440;
+  --neu-light: rgba(62, 71, 83, 0.5);
+  --neu-dark: rgba(18, 22, 28, 0.7);
+  --neu-light-strong: rgba(62, 71, 83, 0.7);
+  --neu-dark-strong: rgba(12, 15, 20, 0.6);
+
+  --text-primary: #e2e8f0;
+  --text-secondary: #a0aec0;
+  --text-muted: #718096;
+
+  /* Accent colors stay the same — they already pop on dark backgrounds */
+
+  color-scheme: dark;
+}
+
+/* Dark mode convex gradient override */
+html.dark .neu-convex {
+  background: linear-gradient(145deg, #323b47, #272e38);
+}
+
+/* Dark mode scrollbar */
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 body {

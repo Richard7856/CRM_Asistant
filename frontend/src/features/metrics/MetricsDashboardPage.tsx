@@ -63,7 +63,7 @@ export default function MetricsDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Metricas</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Metricas</h1>
         <select
           value={range}
           onChange={(e) => setRange(Number(e.target.value) as RangeDays)}
@@ -184,16 +184,16 @@ export default function MetricsDashboardPage() {
       {/* Leaderboard */}
       <div className="neu-flat rounded-xl">
         <div className="p-4 border-b">
-          <h2 className="text-sm font-semibold text-gray-700">Leaderboard - Top Agentes</h2>
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)]">Leaderboard - Top Agentes</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="neu-pressed-sm border-b border-[var(--neu-dark)]">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 w-12">#</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Agente</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Tasa de Exito</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Barra</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)] w-12">#</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Agente</th>
+                <th className="text-right px-4 py-3 font-medium text-[var(--text-secondary)]">Tasa de Exito</th>
+                <th className="text-right px-4 py-3 font-medium text-[var(--text-secondary)] hidden sm:table-cell">Barra</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -202,21 +202,21 @@ export default function MetricsDashboardPage() {
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
                       i === 0 ? "bg-yellow-100 text-yellow-700" :
-                      i === 1 ? "bg-gray-100 text-gray-600" :
+                      i === 1 ? "bg-[var(--neu-dark)]/10 text-[var(--text-secondary)]" :
                       i === 2 ? "bg-orange-100 text-orange-700" :
-                      "text-gray-400"
+                      "text-[var(--text-muted)]"
                     }`}>
                       {i + 1}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{entry.agent_name}</td>
+                  <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{entry.agent_name}</td>
                   <td className="px-4 py-3 text-right font-semibold">
                     <span className={entry.success_rate >= 0.8 ? "text-green-600" : entry.success_rate >= 0.5 ? "text-amber-600" : "text-red-600"}>
                       {formatPercent(entry.success_rate)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right hidden sm:table-cell">
-                    <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="w-full bg-[var(--neu-dark)]/10 rounded-full h-2">
                       <div
                         className="h-2 rounded-full transition-all"
                         style={{
@@ -250,8 +250,8 @@ const accentColors: Record<string, string> = {
 function KpiCard({ title, value, accent = "blue" }: { title: string; value: string; accent?: string }) {
   return (
     <div className={`neu-flat rounded-xl border-l-4 ${accentColors[accent] ?? accentColors.blue} p-4 shadow-sm`}>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">{title}</p>
+      <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{value}</p>
     </div>
   );
 }
@@ -259,7 +259,7 @@ function KpiCard({ title, value, accent = "blue" }: { title: string; value: stri
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="neu-flat rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
+      <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">{title}</h3>
       {children}
     </div>
   );

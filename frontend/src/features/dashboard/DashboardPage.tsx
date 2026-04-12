@@ -9,9 +9,11 @@ import StatusBadge from "@/components/common/StatusBadge";
 import Sparkline from "@/components/charts/Sparkline";
 import { CHART_COLORS } from "@/components/charts/TrendLineChart";
 import { formatRelative, formatPercent, formatCurrency, formatNumber } from "@/lib/formatters";
-import { Users, CheckCircle, TrendingUp, DollarSign } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Users, CheckCircle, TrendingUp, DollarSign, Zap } from "lucide-react";
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { data: agents, isLoading: loadingAgents } = useQuery({
     queryKey: ["agents", { page: 1, size: 50 }],
     queryFn: () => listAgents({ page: 1, size: 50 }),
@@ -54,6 +56,12 @@ export default function DashboardPage() {
     const total = d.completed + d.failed;
     return { value: total > 0 ? d.completed / total : 0 };
   });
+
+  // Top agents by cost — used for the cost breakdown widget
+  const topAgentsByCost = [...(summary?.top_agents ?? [])]
+    .sort((a, b) => b.cost_usd - a.cost_usd)
+    .slice(0, 5);
+  const maxAgentCost = topAgentsByCost.length > 0 ? topAgentsByCost[0]!.cost_usd : 1;
 
   const dailyBarData = last7.map((d) => ({
     date: d.date.slice(5),
@@ -205,25 +213,84 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Department overview */}
-      {departments && departments.items.length > 0 && (
-        <div className="neu-flat p-5">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Departamentos</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            {departments.items.map((dept) => (
-              <div
-                key={dept.id}
-                className="neu-sm p-4 hover:shadow-none transition-shadow duration-200 cursor-pointer"
-              >
-                <p className="text-sm font-medium text-[var(--text-primary)]">{dept.name}</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {dept.agent_count ?? 0} agentes
-                </p>
-              </div>
-            ))}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Department overview */}
+        {departments && departments.items.length > 0 && (
+          <div className="neu-flat p-5">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Departamentos</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {departments.items.map((dept) => (
+                <div
+                  key={dept.id}
+                  onClick={() => navigate(`/departments/${dept.id}`)}
+                  className="neu-sm p-4 hover:shadow-none transition-shadow duration-200 cursor-pointer"
+                >
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{dept.name}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    {dept.agent_count ?? 0} agentes
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Cost Breakdown — shows which agents consume the most tokens/cost */}
+        {topAgentsByCost.length > 0 && (
+          <div className="neu-flat p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+                  Costo por Agente
+                </h2>
+              </div>
+              <span className="text-xs text-[var(--text-muted)]">
+                Total: {formatCurrency(summary?.total_cost_usd ?? 0)}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {topAgentsByCost.map((agent) => {
+                const pct = maxAgentCost > 0 ? (agent.cost_usd / maxAgentCost) * 100 : 0;
+                return (
+                  <div key={agent.agent_id} className="group">
+                    <div className="flex items-center justify-between mb-1">
+                      <button
+                        onClick={() => navigate(`/agents/${agent.agent_id}`)}
+                        className="text-sm font-medium text-[var(--text-primary)] hover:text-indigo-500 transition-colors truncate max-w-[60%] text-left"
+                      >
+                        {agent.agent_name}
+                      </button>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-[var(--text-muted)]">
+                          {agent.tasks_completed} tareas
+                        </span>
+                        <span className="font-semibold text-[var(--text-primary)]">
+                          {formatCurrency(agent.cost_usd)}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Cost bar — visual proportion relative to top spender */}
+                    <div className="h-2 rounded-full neu-pressed-sm overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 3)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Token usage summary */}
+            {summary && (
+              <div className="mt-4 pt-3 border-t border-[var(--neu-dark)]/10 flex items-center justify-between text-xs text-[var(--text-muted)]">
+                <span>{formatNumber(summary.total_token_usage)} tokens totales</span>
+                <span>{summary.agents_measured} agentes medidos</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

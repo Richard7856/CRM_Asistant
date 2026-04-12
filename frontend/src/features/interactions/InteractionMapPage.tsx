@@ -46,15 +46,15 @@ export default function InteractionMapPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Interacciones</h1>
-          <p className="text-sm text-gray-500">Comunicacion entre agentes</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Interacciones</h1>
+          <p className="text-sm text-[var(--text-muted)]">Comunicacion entre agentes</p>
         </div>
         {hasGraph && (
-          <div className="flex bg-gray-100 rounded-lg p-0.5">
+          <div className="flex bg-[var(--neu-dark)]/10 rounded-lg p-0.5">
             <button
               onClick={() => setView("graph")}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                activeView === "graph" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+                activeView === "graph" ? "bg-white shadow text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
               Grafo
@@ -62,7 +62,7 @@ export default function InteractionMapPage() {
             <button
               onClick={() => setView("list")}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                activeView === "list" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+                activeView === "list" ? "bg-white shadow text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
               Lista
@@ -227,11 +227,11 @@ function ForceGraph({
   return (
     <div className="neu-flat rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">Mapa de Interacciones</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-secondary)]">Mapa de Interacciones</h3>
         {activeNode && (
           <button
             onClick={() => { setSelectedNode(null); setHoveredNode(null); }}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
           >
             Limpiar seleccion
           </button>
@@ -241,7 +241,7 @@ function ForceGraph({
       <svg
         ref={svgRef}
         viewBox="0 0 700 450"
-        className="w-full border rounded-lg bg-gray-50"
+        className="w-full border rounded-lg bg-[var(--neu-bg)]"
         style={{ maxHeight: "500px" }}
       >
         {/* Edges */}
@@ -307,11 +307,11 @@ function ForceGraph({
 
       {/* Details panel */}
       {activeNode && (
-        <div className="mt-3 p-3 bg-gray-50 rounded-lg border text-sm">
-          <p className="font-semibold text-gray-800">
+        <div className="mt-3 p-3 bg-[var(--neu-bg)] rounded-lg border text-sm">
+          <p className="font-semibold text-[var(--text-primary)]">
             {positions.find((p) => p.id === activeNode)?.name ?? "Agente"}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Departamento: {positions.find((p) => p.id === activeNode)?.department ?? "--"}
           </p>
           <div className="mt-2 space-y-1">
@@ -320,7 +320,7 @@ function ForceGraph({
                 ? positions.find((p) => p.id === e.target)
                 : positions.find((p) => p.id === e.source);
               return (
-                <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                <div key={i} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                   <span>
                     {e.source === activeNode ? "→" : "←"} {otherNode?.name ?? "??"} ({e.weight} interacciones)
@@ -340,7 +340,7 @@ function ForceGraph({
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: getDeptColor(dept) }}
             />
-            <span className="text-xs text-gray-600">{dept}</span>
+            <span className="text-xs text-[var(--text-secondary)]">{dept}</span>
           </div>
         ))}
       </div>
@@ -354,7 +354,7 @@ function InteractionList({ items }: { items: { id: string; from_agent_name?: str
   if (items.length === 0) {
     return (
       <div className="neu-flat rounded-xl p-8 text-center">
-        <p className="text-gray-400 text-sm">No hay interacciones registradas.</p>
+        <p className="text-[var(--text-muted)] text-sm">No hay interacciones registradas.</p>
       </div>
     );
   }
@@ -365,12 +365,12 @@ function InteractionList({ items }: { items: { id: string; from_agent_name?: str
         <div key={interaction.id} className="px-4 py-3 flex items-center gap-4 hover:bg-[var(--neu-dark)]/20 transition-colors">
           <div className="flex-1 min-w-0">
             <p className="text-sm">
-              <span className="font-medium text-gray-900">{interaction.from_agent_name ?? "Agente"}</span>
-              <span className="text-gray-400 mx-2">&rarr;</span>
-              <span className="font-medium text-gray-900">{interaction.to_agent_name ?? "Agente"}</span>
+              <span className="font-medium text-[var(--text-primary)]">{interaction.from_agent_name ?? "Agente"}</span>
+              <span className="text-[var(--text-muted)] mx-2">&rarr;</span>
+              <span className="font-medium text-[var(--text-primary)]">{interaction.to_agent_name ?? "Agente"}</span>
             </p>
             {interaction.payload_summary && (
-              <p className="text-xs text-gray-500 mt-0.5 truncate">{interaction.payload_summary}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{interaction.payload_summary}</p>
             )}
           </div>
           <span
@@ -382,7 +382,7 @@ function InteractionList({ items }: { items: { id: string; from_agent_name?: str
           >
             {interaction.success ? "OK" : "Error"}
           </span>
-          <span className="text-xs text-gray-400 whitespace-nowrap">
+          <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
             {formatRelative(interaction.occurred_at)}
           </span>
         </div>

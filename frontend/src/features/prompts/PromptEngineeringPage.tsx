@@ -36,7 +36,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   ventas: "bg-blue-100 text-blue-700",
   soporte: "bg-green-100 text-green-700",
   analytics: "bg-orange-100 text-orange-700",
-  general: "bg-gray-100 text-gray-700",
+  general: "bg-[var(--neu-dark)]/10 text-[var(--text-secondary)]",
 };
 
 const CATEGORY_OPTIONS = [
@@ -148,7 +148,7 @@ function TemplatesTab() {
   if (showEditor) {
     return (
       <div className="neu-flat rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           {editingTemplate ? "Editar Template" : "Crear Template"}
         </h2>
         <PromptEditor
@@ -176,12 +176,12 @@ function TemplatesTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar templates..."
-          className="flex-1 max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 max-w-xs rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           {CATEGORY_OPTIONS.map((c) => (
             <option key={c.value} value={c.value}>
@@ -223,7 +223,7 @@ function TemplatesTab() {
                 onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-900 leading-tight">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)] leading-tight">
                     {t.name}
                   </h3>
                   <span
@@ -235,7 +235,7 @@ function TemplatesTab() {
                   </span>
                 </div>
                 {t.description && (
-                  <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+                  <p className="text-xs text-[var(--text-muted)] line-clamp-2 mb-2">
                     {t.description}
                   </p>
                 )}
@@ -243,13 +243,13 @@ function TemplatesTab() {
                   {t.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded"
+                      className="text-xs bg-[var(--neu-dark)]/10 text-[var(--text-secondary)] px-2 py-0.5 rounded"
                     >
                       {tag}
                     </span>
                   ))}
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-400">
+                <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
                   <span>Usos: {t.usage_count}</span>
                   <span>{formatRelative(t.created_at)}</span>
                 </div>
@@ -261,14 +261,14 @@ function TemplatesTab() {
                   <div className="bg-gray-900 text-green-400 font-mono text-xs p-3 rounded-lg max-h-48 overflow-y-auto whitespace-pre-wrap">
                     {t.system_prompt}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     {t.model_provider && (
-                      <span className="bg-gray-100 px-2 py-0.5 rounded">
+                      <span className="bg-[var(--neu-dark)]/10 px-2 py-0.5 rounded">
                         {t.model_provider}
                       </span>
                     )}
                     {t.model_name && (
-                      <span className="bg-gray-100 px-2 py-0.5 rounded">
+                      <span className="bg-[var(--neu-dark)]/10 px-2 py-0.5 rounded">
                         {t.model_name}
                       </span>
                     )}
@@ -791,12 +791,12 @@ function ApplyTemplatePanel({
   return (
     <div className="neu-flat rounded-xl p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">
           Aplicar Template al Agente
         </h3>
         <button
           onClick={onClose}
-          className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+          className="px-3 py-1.5 text-sm text-[var(--text-secondary)] bg-[var(--neu-dark)]/10 rounded-md hover:bg-[var(--neu-dark)]/20"
         >
           Cerrar
         </button>
@@ -807,26 +807,26 @@ function ApplyTemplatePanel({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar templates..."
-        className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="w-full max-w-xs rounded-md border border-[var(--neu-dark)]/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
       {isLoading && <LoadingSpinner />}
 
       {!isLoading && templates.length === 0 && (
-        <p className="text-sm text-gray-500">No se encontraron templates.</p>
+        <p className="text-sm text-[var(--text-muted)]">No se encontraron templates.</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
         {templates.map((t) => (
           <div
             key={t.id}
-            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:border-indigo-300"
+            className="flex items-center justify-between p-3 bg-[var(--neu-bg)] rounded-lg border hover:border-indigo-300"
           >
             <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                 {t.name}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--text-muted)]">
                 {t.category} &middot; Usos: {t.usage_count}
               </p>
             </div>

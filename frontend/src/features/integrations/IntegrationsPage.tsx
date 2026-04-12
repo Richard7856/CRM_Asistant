@@ -8,19 +8,19 @@ const PLATFORM_BADGES: Record<string, { label: string; bg: string; text: string 
   n8n: { label: "n8n", bg: "bg-orange-100", text: "text-orange-700" },
   langchain: { label: "LangChain", bg: "bg-green-100", text: "text-green-700" },
   crewai: { label: "CrewAI", bg: "bg-blue-100", text: "text-blue-700" },
-  openai: { label: "OpenAI", bg: "bg-gray-100", text: "text-gray-700" },
+  openai: { label: "OpenAI", bg: "bg-[var(--neu-dark)]/10", text: "text-[var(--text-secondary)]" },
   autogen: { label: "AutoGen", bg: "bg-purple-100", text: "text-purple-700" },
-  custom: { label: "Custom", bg: "bg-gray-100", text: "text-gray-600" },
+  custom: { label: "Custom", bg: "bg-[var(--neu-dark)]/10", text: "text-[var(--text-secondary)]" },
 };
 
 function getPlatformBadge(platform: string | null | undefined): { label: string; bg: string; text: string } {
-  const fallback = { label: "Custom", bg: "bg-gray-100", text: "text-gray-600" };
+  const fallback = { label: "Custom", bg: "bg-[var(--neu-dark)]/10", text: "text-[var(--text-secondary)]" };
   if (!platform) return fallback;
   const key = platform.toLowerCase();
   for (const [k, v] of Object.entries(PLATFORM_BADGES)) {
     if (key.includes(k)) return v;
   }
-  return { label: platform, bg: "bg-gray-100", text: "text-gray-600" };
+  return { label: platform, bg: "bg-[var(--neu-dark)]/10", text: "text-[var(--text-secondary)]" };
 }
 
 export default function IntegrationsPage() {
@@ -59,21 +59,21 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Integraciones</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Integraciones</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
           Gestiona conexiones con agentes externos y plataformas de IA.
         </p>
       </div>
 
       {/* External Agents */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">
           Agentes Externos ({externalAgents.length})
         </h2>
         {externalAgents.length === 0 ? (
           <div className="neu-flat rounded-xl p-8 text-center">
-            <p className="text-gray-400 text-sm">No hay agentes externos registrados.</p>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-[var(--text-muted)] text-sm">No hay agentes externos registrados.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-2">
               Registra agentes externos desde la seccion de Agentes para verlos aqui.
             </p>
           </div>
@@ -100,13 +100,13 @@ export default function IntegrationsPage() {
 
       {/* Internal Agents Summary */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">
           Agentes Internos ({internalAgents.length})
         </h2>
         <div className="neu-flat rounded-xl">
           <div className="divide-y max-h-64 overflow-y-auto">
             {internalAgents.length === 0 ? (
-              <p className="p-4 text-sm text-gray-400">No hay agentes internos.</p>
+              <p className="p-4 text-sm text-[var(--text-muted)]">No hay agentes internos.</p>
             ) : (
               internalAgents.map((agent) => (
                 <div key={agent.id} className="flex items-center justify-between px-4 py-3 hover:bg-[var(--neu-dark)]/20 transition-colors">
@@ -115,13 +115,13 @@ export default function IntegrationsPage() {
                       {agent.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{agent.name}</p>
-                      <p className="text-xs text-gray-500">{agent.department_name ?? "Sin departamento"}</p>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{agent.name}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{agent.department_name ?? "Sin departamento"}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <HealthDot status={agent.status} />
-                    <span className="text-xs text-gray-500 capitalize">{agent.status}</span>
+                    <span className="text-xs text-[var(--text-muted)] capitalize">{agent.status}</span>
                   </div>
                 </div>
               ))
@@ -132,7 +132,7 @@ export default function IntegrationsPage() {
 
       {/* Supported Platforms */}
       <div className="neu-flat rounded-xl p-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Plataformas Soportadas</h2>
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">Plataformas Soportadas</h2>
         <div className="flex flex-wrap gap-3">
           {Object.entries(PLATFORM_BADGES).map(([key, badge]) => (
             <div
@@ -144,7 +144,7 @@ export default function IntegrationsPage() {
             </div>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-[var(--text-muted)] mt-3">
           Conecta agentes de cualquier plataforma via API REST, webhooks o message queue.
         </p>
       </div>
@@ -203,8 +203,8 @@ function AgentIntegrationCard({
             {agent.name.slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{agent.name}</p>
-            <p className="text-xs text-gray-500">{agent.department_name ?? "Sin departamento"}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{agent.name}</p>
+            <p className="text-xs text-[var(--text-muted)]">{agent.department_name ?? "Sin departamento"}</p>
           </div>
         </div>
         <HealthDot status={agent.status} />
@@ -214,7 +214,7 @@ function AgentIntegrationCard({
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
           {badge.label}
         </span>
-        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--neu-dark)]/10 text-[var(--text-secondary)]">
           {agent.origin}
         </span>
         {agent.capabilities.slice(0, 3).map((cap) => (
@@ -223,7 +223,7 @@ function AgentIntegrationCard({
           </span>
         ))}
         {agent.capabilities.length > 3 && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-500">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--neu-bg)] text-[var(--text-muted)]">
             +{agent.capabilities.length - 3}
           </span>
         )}
@@ -241,7 +241,7 @@ function AgentIntegrationCard({
               ? "bg-green-50 text-green-700 hover:bg-green-100"
               : healthColor === "red"
                 ? "bg-red-50 text-red-700 hover:bg-red-100"
-                : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                : "bg-[var(--neu-bg)] text-[var(--text-secondary)] hover:bg-[var(--neu-dark)]/10"
           } disabled:opacity-50`}
         >
           {isCheckingHealth ? "Verificando..." : "Verificar Salud"}
@@ -249,7 +249,7 @@ function AgentIntegrationCard({
         <span className={`text-[10px] font-medium ${
           healthColor === "green" ? "text-green-600" :
           healthColor === "red" ? "text-red-600" :
-          "text-gray-400"
+          "text-[var(--text-muted)]"
         }`}>
           {healthColor === "green" ? "Saludable" : healthColor === "red" ? "No saludable" : "Desconocido"}
         </span>
@@ -274,14 +274,14 @@ function DetailPanel({ detail, loading }: { detail?: AgentDetail; loading: boole
 
   return (
     <div className="neu-flat rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">
         Detalles de Integracion: {detail.name}
       </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Integration Info */}
         <div className="space-y-3">
-          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Integracion</h4>
+          <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Integracion</h4>
           {integration ? (
             <div className="space-y-2 text-sm">
               <InfoRow label="Tipo" value={integration.integration_type} />
@@ -292,13 +292,13 @@ function DetailPanel({ detail, loading }: { detail?: AgentDetail; loading: boole
               <InfoRow label="Ultima sincronizacion" value={integration.last_sync_at ?? "Nunca"} />
             </div>
           ) : (
-            <p className="text-xs text-gray-400">Sin datos de integracion.</p>
+            <p className="text-xs text-[var(--text-muted)]">Sin datos de integracion.</p>
           )}
         </div>
 
         {/* Definition Info */}
         <div className="space-y-3">
-          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Definicion</h4>
+          <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Definicion</h4>
           {definition ? (
             <div className="space-y-2 text-sm">
               <InfoRow label="Proveedor" value={definition.model_provider ?? "--"} />
@@ -309,17 +309,17 @@ function DetailPanel({ detail, loading }: { detail?: AgentDetail; loading: boole
               <InfoRow label="Version" value={`v${definition.version}`} />
             </div>
           ) : (
-            <p className="text-xs text-gray-400">Sin definicion de agente.</p>
+            <p className="text-xs text-[var(--text-muted)]">Sin definicion de agente.</p>
           )}
         </div>
       </div>
 
       {/* Capabilities */}
       <div className="mt-4">
-        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Capacidades</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide mb-2">Capacidades</h4>
         <div className="flex flex-wrap gap-2">
           {detail.capabilities.length === 0 ? (
-            <p className="text-xs text-gray-400">Sin capacidades definidas.</p>
+            <p className="text-xs text-[var(--text-muted)]">Sin capacidades definidas.</p>
           ) : (
             detail.capabilities.map((cap) => (
               <span key={cap} className="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-medium">
@@ -336,8 +336,8 @@ function DetailPanel({ detail, loading }: { detail?: AgentDetail; loading: boole
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between">
-      <span className="text-gray-500 text-xs">{label}</span>
-      <span className={`text-gray-900 text-xs font-medium ${mono ? "font-mono" : ""} max-w-[60%] text-right truncate`}>
+      <span className="text-[var(--text-muted)] text-xs">{label}</span>
+      <span className={`text-[var(--text-primary)] text-xs font-medium ${mono ? "font-mono" : ""} max-w-[60%] text-right truncate`}>
         {value}
       </span>
     </div>
