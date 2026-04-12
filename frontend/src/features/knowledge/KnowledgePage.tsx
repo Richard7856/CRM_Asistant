@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { BookOpen, Plus, Trash2, Search, FileText, Globe, Building2, X } from "lucide-react";
+import { BookOpen, Plus, Trash2, Search, FileText, Globe, Building2 } from "lucide-react";
 import {
   listDocuments,
   ingestDocument,

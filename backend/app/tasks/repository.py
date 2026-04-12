@@ -17,7 +17,11 @@ class TaskRepository:
         return select(Task).where(Task.organization_id == self.org_id)
 
     async def get_by_id(self, task_id: uuid.UUID) -> Task | None:
-        result = await self.db.execute(self._scoped().where(Task.id == task_id))
+        result = await self.db.execute(
+            self._scoped()
+            .options(selectinload(Task.assignee), selectinload(Task.department))
+            .where(Task.id == task_id)
+        )
         return result.scalar_one_or_none()
 
     async def list_all(
@@ -48,7 +52,7 @@ class TaskRepository:
         total = (await self.db.execute(count_base)).scalar_one()
 
         result = await self.db.execute(
-            query.options(selectinload(Task.assignee))
+            query.options(selectinload(Task.assignee), selectinload(Task.department))
             .order_by(Task.created_at.desc())
             .offset(pagination.offset)
             .limit(pagination.size)

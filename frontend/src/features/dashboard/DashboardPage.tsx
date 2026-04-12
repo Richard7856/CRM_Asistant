@@ -253,7 +253,7 @@ export default function DashboardPage() {
               {topAgentsByCost.map((agent) => {
                 const pct = maxAgentCost > 0 ? (agent.cost_usd / maxAgentCost) * 100 : 0;
                 return (
-                  <div key={agent.agent_id} className="group">
+                  <div key={`cost-${agent.agent_id}`} className="group">
                     <div className="flex items-center justify-between mb-1">
                       <button
                         onClick={() => navigate(`/agents/${agent.agent_id}`)}

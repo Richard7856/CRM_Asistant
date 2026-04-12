@@ -25,9 +25,11 @@ class TaskService:
     def _to_response(task: Task) -> TaskResponse:
         """Convert Task ORM model to response, including joined agent name."""
         resp = TaskResponse.model_validate(task)
-        # Populate assignee_name from the eagerly-loaded relationship
+        # Populate names from eagerly-loaded relationships
         if hasattr(task, "assignee") and task.assignee is not None:
             resp.assignee_name = task.assignee.name
+        if hasattr(task, "department") and task.department is not None:
+            resp.department_name = task.department.name
         return resp
 
     async def _resolve_assignee(self, data: TaskCreate) -> uuid.UUID | None:

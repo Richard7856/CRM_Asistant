@@ -50,3 +50,4 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     assignee_name: str | None = None
+    department_name: str | None = None

@@ -206,7 +206,7 @@ export default function LoginPage() {
 
         {/* Demo hint */}
         <p className="text-center text-xs text-[var(--text-muted)] mt-6">
-          Demo: richard@crmagents.io / Demo2026!
+          Demo: richard@crmagents.io / admin123
         </p>
       </div>
     </div>
