@@ -298,8 +298,3 @@ The REST API is versioned under `/api/v1`. All endpoints except auth require a J
 | `/integrations` | External platform management and health status |
 | `/knowledge` | RAG knowledge base — upload documents, search, manage scope |
 
----
-
-## License
-
-MIT — see [LICENSE](LICENSE) for details.
