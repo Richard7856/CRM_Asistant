@@ -25,7 +25,7 @@ from app.metrics.models import PerformanceMetric  # noqa: F401
 from app.interactions.models import AgentInteraction  # noqa: F401
 from app.improvements.models import ImprovementPoint  # noqa: F401
 from app.prompts.models import PromptVersion, PromptTemplate  # noqa: F401
-from app.auth.models import Organization, User  # noqa: F401
+from app.auth.models import Organization, User, TokenBlacklist  # noqa: F401
 from app.knowledge.models import KnowledgeDocument, KnowledgeChunk  # noqa: F401
 from app.credentials.models import Credential  # noqa: F401
 from app.notifications.models import Notification  # noqa: F401

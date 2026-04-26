@@ -33,3 +33,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Fail fast in production if JWT secret was not changed from the insecure default
+_INSECURE_JWT_DEFAULT = "CHANGE-ME-in-production-use-openssl-rand-hex-32"
+if not settings.debug and settings.jwt_secret_key == _INSECURE_JWT_DEFAULT:
+    raise RuntimeError(
+        "FATAL: JWT_SECRET_KEY is still the default value. "
+        "Set a secure secret via environment variable or .env file. "
+        "Generate one with: openssl rand -hex 32"
+    )

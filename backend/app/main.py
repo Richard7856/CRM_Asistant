@@ -6,7 +6,11 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.core.middleware import RequestTimingMiddleware
+from app.core.middleware import (
+    RateLimitMiddleware,
+    RequestTimingMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.auth.dependencies import get_current_user
 
 # Import routers
@@ -30,6 +34,8 @@ from app.workers.metrics_calculator import run_metrics_calculator
 from app.workers.heartbeat_monitor import run_monitor as run_heartbeat_monitor
 from app.workers.integration_health_checker import run_health_checker
 from app.workers.lifecycle_monitor import run_lifecycle_monitor
+from app.auth.service import cleanup_expired_blacklist
+from app.core.database import async_session_factory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +48,19 @@ async def lifespan(app: FastAPI):
     # Spawn background workers as asyncio tasks.
     # They run concurrently with FastAPI's event loop — no threads needed.
     # On shutdown, we cancel them cleanly so no zombie tasks are left.
+    async def run_blacklist_cleanup(interval_seconds: int = 3600) -> None:
+        """Purge expired token blacklist entries hourly — prevents unbounded table growth."""
+        while True:
+            await asyncio.sleep(interval_seconds)
+            try:
+                async with async_session_factory() as session:
+                    count = await cleanup_expired_blacklist(session)
+                    await session.commit()
+                    if count > 0:
+                        logger.info("Cleaned up %d expired blacklist entries", count)
+            except Exception:
+                logger.exception("Blacklist cleanup failed")
+
     worker_tasks = [
         asyncio.create_task(
             run_metrics_calculator(interval_seconds=3600),  # recalculate metrics every hour
@@ -58,6 +77,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(
             run_lifecycle_monitor(interval_seconds=86400),  # check idle agents every 24h
             name="lifecycle_monitor",
+        ),
+        asyncio.create_task(
+            run_blacklist_cleanup(interval_seconds=3600),  # purge expired entries every hour
+            name="blacklist_cleanup",
         ),
     ]
     logger.info("Started %d background workers", len(worker_tasks))
@@ -77,14 +100,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Middleware
+# Middleware — order matters: first added = outermost (runs first)
+# 1. CORS (outermost — must handle preflight OPTIONS before other middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+# 2. Security headers on every response
+app.add_middleware(SecurityHeadersMiddleware)
+# 3. Rate limiting on auth endpoints
+app.add_middleware(RateLimitMiddleware)
+# 4. Request timing (innermost — measures actual handler time)
 app.add_middleware(RequestTimingMiddleware)
 
 prefix = settings.api_v1_prefix

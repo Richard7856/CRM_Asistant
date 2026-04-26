@@ -13,7 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth.models import Organization, User, UserRole
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from app.auth.models import Organization, TokenBlacklist, User, UserRole
 from app.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -33,7 +35,9 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(user_id: uuid.UUID, org_id: uuid.UUID, role: str) -> str:
+def create_access_token(user_id: uuid.UUID, org_id: uuid.UUID, role: str) -> tuple[str, str]:
+    """Returns (token, jti) — jti is the unique ID used for blacklisting."""
+    jti = str(uuid.uuid4())
     expires = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {
         "sub": str(user_id),
@@ -41,18 +45,24 @@ def create_access_token(user_id: uuid.UUID, org_id: uuid.UUID, role: str) -> str
         "role": role,
         "exp": expires,
         "type": "access",
+        "jti": jti,
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return token, jti
 
 
-def create_refresh_token(user_id: uuid.UUID) -> str:
+def create_refresh_token(user_id: uuid.UUID) -> tuple[str, str]:
+    """Returns (token, jti) — jti is the unique ID used for blacklisting."""
+    jti = str(uuid.uuid4())
     expires = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     payload = {
         "sub": str(user_id),
         "exp": expires,
         "type": "refresh",
+        "jti": jti,
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return token, jti
 
 
 def decode_token(token: str) -> dict:
@@ -131,7 +141,10 @@ async def get_user_by_id(user_id: uuid.UUID, db: AsyncSession) -> User | None:
 
 
 async def refresh_tokens(refresh_token: str, db: AsyncSession) -> tuple[str, str]:
-    """Validate a refresh token and return a new access + refresh token pair."""
+    """
+    Validate a refresh token and return a new access + refresh pair.
+    Implements rotation: the old refresh token is blacklisted after use.
+    """
     try:
         payload = decode_token(refresh_token)
     except JWTError:
@@ -140,11 +153,67 @@ async def refresh_tokens(refresh_token: str, db: AsyncSession) -> tuple[str, str
     if payload.get("type") != "refresh":
         raise ValueError("Token no es de tipo refresh")
 
+    # Check if old refresh token was already used (rotation protection)
+    old_jti = payload.get("jti")
+    if old_jti and await is_token_blacklisted(old_jti, db):
+        raise ValueError("Refresh token ya fue utilizado")
+
     user_id = uuid.UUID(payload["sub"])
     user = await get_user_by_id(user_id, db)
     if user is None or not user.is_active:
         raise ValueError("Usuario no encontrado o inactivo")
 
-    access = create_access_token(user.id, user.organization_id, user.role.value)
-    refresh = create_refresh_token(user.id)
+    # Issue new pair
+    access, _ = create_access_token(user.id, user.organization_id, user.role.value)
+    refresh, _ = create_refresh_token(user.id)
+
+    # Blacklist old refresh token so it can't be reused
+    if old_jti:
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        await blacklist_token(old_jti, "refresh", user_id, expires_at, db)
+
     return access, refresh
+
+
+# ─── Token blacklist ───
+
+
+async def blacklist_token(
+    jti: str,
+    token_type: str,
+    user_id: uuid.UUID,
+    expires_at: datetime,
+    db: AsyncSession,
+) -> None:
+    """Add a token JTI to the blacklist. Idempotent — ignores duplicates."""
+    stmt = (
+        pg_insert(TokenBlacklist)
+        .values(
+            jti=jti,
+            token_type=token_type,
+            user_id=user_id,
+            expires_at=expires_at,
+        )
+        .on_conflict_do_nothing(index_elements=["jti"])
+    )
+    await db.execute(stmt)
+
+
+async def is_token_blacklisted(jti: str, db: AsyncSession) -> bool:
+    """Check if a token JTI has been revoked."""
+    result = await db.execute(
+        select(TokenBlacklist.id).where(TokenBlacklist.jti == jti).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def cleanup_expired_blacklist(db: AsyncSession) -> int:
+    """Remove blacklist entries for tokens that have already expired. Returns count deleted."""
+    from sqlalchemy import delete
+
+    result = await db.execute(
+        delete(TokenBlacklist).where(
+            TokenBlacklist.expires_at < datetime.now(timezone.utc)
+        )
+    )
+    return result.rowcount

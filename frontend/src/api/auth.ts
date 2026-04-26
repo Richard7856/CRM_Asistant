@@ -53,3 +53,10 @@ export async function getMeApi(): Promise<UserProfile> {
   const { data } = await apiClient.get<UserProfile>("/auth/me");
   return data;
 }
+
+/** Server-side logout — blacklists access + refresh tokens so they can't be reused. */
+export async function logoutApi(refreshToken?: string | null): Promise<void> {
+  await apiClient.post("/auth/logout", {
+    refresh_token: refreshToken ?? null,
+  });
+}

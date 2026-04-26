@@ -1,15 +1,21 @@
 """
-Auth router — register, login, refresh, and user profile endpoints.
+Auth router — register, login, refresh, logout, and user profile endpoints.
 Public routes (no auth required): register, login, refresh, health.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.auth.schemas import (
     LoginRequest,
+    LogoutRequest,
+    MessageResponse,
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
@@ -17,13 +23,17 @@ from app.auth.schemas import (
 )
 from app.auth.service import (
     authenticate_user,
+    blacklist_token,
     create_access_token,
     create_refresh_token,
+    decode_token,
     refresh_tokens,
     register_user,
 )
 from app.config import settings
 from app.core.database import get_db
+
+_bearer = HTTPBearer()
 
 router = APIRouter()
 
@@ -47,8 +57,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
-    access = create_access_token(user.id, org.id, user.role.value)
-    refresh = create_refresh_token(user.id)
+    access, _ = create_access_token(user.id, org.id, user.role.value)
+    refresh, _ = create_refresh_token(user.id)
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
@@ -66,8 +76,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Credenciales invalidas",
         )
 
-    access = create_access_token(user.id, user.organization_id, user.role.value)
-    refresh = create_refresh_token(user.id)
+    access, _ = create_access_token(user.id, user.organization_id, user.role.value)
+    refresh, _ = create_refresh_token(user.id)
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
@@ -103,3 +113,40 @@ async def get_me(user: User = Depends(get_current_user)):
         organization_name=user.organization.name if user.organization else None,
         created_at=user.created_at,
     )
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout(
+    body: LogoutRequest | None = None,
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Revoke the current access token (and optionally the refresh token).
+    Both tokens are added to the blacklist so they can't be reused.
+    """
+    # Blacklist the access token from the Authorization header
+    try:
+        access_payload = decode_token(credentials.credentials)
+        access_jti = access_payload.get("jti")
+        if access_jti:
+            expires_at = datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc)
+            await blacklist_token(access_jti, "access", user.id, expires_at, db)
+    except JWTError:
+        pass  # Token was already validated by get_current_user
+
+    # Optionally blacklist the refresh token too
+    if body and body.refresh_token:
+        try:
+            refresh_payload = decode_token(body.refresh_token)
+            # Verify the refresh token belongs to this user
+            if refresh_payload.get("sub") == str(user.id) and refresh_payload.get("type") == "refresh":
+                refresh_jti = refresh_payload.get("jti")
+                if refresh_jti:
+                    expires_at = datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc)
+                    await blacklist_token(refresh_jti, "refresh", user.id, expires_at, db)
+        except JWTError:
+            pass  # Expired/invalid refresh token — nothing to blacklist
+
+    return MessageResponse(message="Sesion cerrada exitosamente")

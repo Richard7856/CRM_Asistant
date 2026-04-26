@@ -13,6 +13,7 @@ import {
   registerApi,
   refreshApi,
   getMeApi,
+  logoutApi,
 } from "@/api/auth";
 
 const TOKEN_KEY = "crm_access_token";
@@ -29,7 +30,7 @@ interface AuthState {
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string, orgName: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   /** Silent token refresh — called by the axios interceptor on 401 */
   refresh: () => Promise<string | null>;
 }
@@ -101,7 +102,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user, isAuthenticated: true });
   },
 
-  logout: () => {
+  logout: async () => {
+    // Best-effort server-side logout — blacklists tokens so they can't be reused.
+    // If the API call fails (server down, token expired), we still clear local state.
+    const rt = get().refreshToken;
+    try {
+      await logoutApi(rt);
+    } catch {
+      // Intentional: logout must always succeed from the user's perspective
+    }
     clearTokens();
     set({ token: null, refreshToken: null, user: null, isAuthenticated: false });
   },

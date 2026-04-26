@@ -11,7 +11,7 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User, UserRole
-from app.auth.service import decode_token, get_user_by_id
+from app.auth.service import decode_token, get_user_by_id, is_token_blacklisted
 from app.core.database import get_db
 
 # Bearer token extractor — looks for "Authorization: Bearer <token>"
@@ -46,6 +46,15 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Se requiere un access token",
+        )
+
+    # Tokens minted before Phase 5A lack a jti — skip blacklist check for backward compat
+    jti = payload.get("jti")
+    if jti and await is_token_blacklisted(jti, db):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token ha sido revocado",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     user_id = uuid.UUID(payload["sub"])

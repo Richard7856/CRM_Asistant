@@ -386,3 +386,35 @@ El frontend muestra esta info en el `AgentLifecycleCard`: "Creado por [Agent Nam
 **Riesgos/Limitaciones:**
 - Si el proceso se reinicia, el timer se resetea y la próxima evaluación ocurre 24h después del reinicio.
 - La detección no es deduplicada entre reinicios — pero sí evita spam chequeando si ya existe una notificación idle no leída para ese agente.
+
+---
+
+## [2026-04-12] Phase 5A: Security hardening — token blacklist, rate limiting, security headers
+
+**Contexto:** CRM Agents estaba demo-ready (4 fases) pero no podía aceptar datos reales de clientes. Sin rate limiting, un brute-force en `/login` era trivial. Sin token revocation, logout era cosmético (solo borraba el token del browser). Sin refresh token rotation, un token comprometido valía 7 días completos.
+
+**Decisión — Token blacklist via JTI:**
+Cada JWT (access y refresh) ahora incluye un claim `jti` (JWT ID, UUID). Al hacer logout o refresh, el JTI del token anterior se inserta en la tabla `token_blacklist`. Cada request autenticado chequea el JTI contra la blacklist antes de aceptar el token.
+
+**Por qué JTI y no el token completo:** Un JTI es un UUID de 36 chars — indexa eficientemente en PostgreSQL con un índice B-tree. El token completo es 300+ bytes y requiere hashing para indexar. JTI es el estándar de la industria (RFC 7519 §4.1.7).
+
+**Alternativas consideradas:**
+- Refresh token families (como Auth0) — tabla `refresh_token_families` que trackea toda la cadena de rotación. Si se detecta reuse de un token viejo, se invalida toda la familia. Más seguro contra replay attacks sofisticados, pero agrega complejidad de modelo significativa. Para MVP, blacklist simple es suficiente.
+- Redis para blacklist — más rápido que PostgreSQL para lookups simples. Pero agrega una dependencia de infraestructura. Aceptable migrar a Redis en Phase 7 cuando se necesite multi-worker.
+- Full token storage en DB — requiere almacenar tokens completos y buscar por string matching. Ineficiente y no aporta nada sobre JTI.
+
+**Decisión — Rate limiting in-memory:**
+Sliding window counter por IP:path en un `dict[str, list[float]]` en memoria. Límites: login 5/60s, register 3/60s, refresh 10/60s. Sin dependencias externas.
+
+**Por qué in-memory y no Redis/slowapi:** Mismo razonamiento que el rate limiting de tools (Phase 4): single-process uvicorn, estado se pierde en restart pero no causa daño. `slowapi` agrega dependencia por algo que son ~60 líneas de código. Redis migración en Phase 7.
+
+**Decisión — Backward compatibility:**
+Tokens emitidos antes de Phase 5A no tienen `jti`. El check de blacklist se salta cuando `payload.get("jti")` retorna None. Esto permite zero-downtime upgrade — tokens existentes en browsers siguen funcionando hasta que expiren naturalmente (30min access, 7 días refresh).
+
+**Riesgos/Limitaciones:**
+- Rate limiting in-memory no sobrevive reinicios y no es compartido entre workers. Aceptable para single-process MVP.
+- Blacklist table crece con cada logout/refresh. Un worker cada hora limpia entradas expiradas (`expires_at < now()`), manteniendo la tabla acotada.
+- Múltiples usuarios detrás del mismo NAT corporativo comparten IP — los límites son generosos (5/min login) para minimizar falsos positivos.
+
+**Archivos modificados:** `auth/models.py`, `auth/service.py`, `auth/dependencies.py`, `auth/router.py`, `auth/schemas.py`, `core/middleware.py`, `main.py`, `config.py`
+**Migration:** `3313605f6b2a_add_token_blacklist`

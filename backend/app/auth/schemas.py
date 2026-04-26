@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.auth.models import UserRole
 
@@ -16,6 +16,18 @@ class RegisterRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     org_name: str = Field(min_length=1, max_length=120, description="Organization name — created on first signup")
 
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        """Enforce NIST 800-63B basics — no special char requirement (security theater)."""
+        if not any(c.isupper() for c in v):
+            raise ValueError("La contrasena debe tener al menos una mayuscula")
+        if not any(c.islower() for c in v):
+            raise ValueError("La contrasena debe tener al menos una minuscula")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("La contrasena debe tener al menos un numero")
+        return v
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -26,6 +38,10 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None  # optionally blacklist the refresh token too
+
+
 # ─── Response schemas ───
 
 class TokenResponse(BaseModel):
@@ -33,6 +49,10 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 class UserResponse(BaseModel):
