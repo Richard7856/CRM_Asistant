@@ -166,3 +166,46 @@ async def auth_headers(test_user, test_org) -> dict[str, str]:
     """Bearer token headers for test_user — drop into any authenticated request."""
     token, _ = create_access_token(test_user.id, test_org.id, test_user.role.value)
     return {"Authorization": f"Bearer {token}"}
+
+
+# ─── Second org fixtures (for tenant isolation tests) ─────────────────────────
+# These let us create resources in TWO different orgs in the same test, then
+# verify that org A's user cannot see/modify/delete org B's data.
+
+
+@pytest_asyncio.fixture
+async def second_org(db) -> Organization:
+    """A second Organization, fully separate from test_org."""
+    org = Organization(
+        name="Second Test Organization",
+        slug=f"test-org-2-{uuid.uuid4().hex[:12]}",
+    )
+    db.add(org)
+    await db.flush()
+    await db.refresh(org)
+    return org
+
+
+@pytest_asyncio.fixture
+async def second_user(db, second_org) -> User:
+    """User belonging to second_org. Password is 'Test1234'."""
+    user = User(
+        email=f"user2-{uuid.uuid4().hex[:8]}@test.io",
+        password_hash=hash_password("Test1234"),
+        full_name="Second Org User",
+        role=UserRole.OWNER,
+        organization_id=second_org.id,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def second_auth_headers(second_user, second_org) -> dict[str, str]:
+    """Bearer token for second_user — used to make requests AS the second org."""
+    token, _ = create_access_token(
+        second_user.id, second_org.id, second_user.role.value
+    )
+    return {"Authorization": f"Bearer {token}"}
