@@ -40,3 +40,6 @@ postgres_data/
 # Database
 *.db
 *.sqlite3
+
+# Local-only docs (no compartir — contienen analisis interno de seguridad)
+SECURITY.md
