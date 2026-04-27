@@ -44,6 +44,18 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
 # ─── Rate Limiting ───
 
 
+# Module-level state — exposed for tests and future admin reset endpoints.
+# The middleware instance is constructed once per app boot; keeping state at module
+# level means we can reset between tests without grabbing the middleware instance
+# out of Starlette's middleware stack.
+_RATE_LIMIT_BUCKETS: dict[str, list[float]] = defaultdict(list)
+
+
+def reset_rate_limit_state() -> None:
+    """Clear all rate limit buckets. Used by tests; safe to call from admin tools."""
+    _RATE_LIMIT_BUCKETS.clear()
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     In-memory sliding window rate limiter for auth endpoints.
@@ -63,8 +75,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app):
         super().__init__(app)
-        # Maps "ip:path" → list of request timestamps
-        self._buckets: dict[str, list[float]] = defaultdict(list)
+        # Reference the module-level buckets so tests/admin can reset them
+        self._buckets = _RATE_LIMIT_BUCKETS
         self._request_count = 0
 
     def _get_client_ip(self, request: Request) -> str:

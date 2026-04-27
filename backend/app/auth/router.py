@@ -6,11 +6,13 @@ Public routes (no auth required): register, login, refresh, health.
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user
+# Reuse the same HTTPBearer instance from dependencies — it has auto_error=False so
+# missing tokens produce 401 (not the default 403 that auto_error=True would give).
+from app.auth.dependencies import _bearer, get_current_user
 from app.auth.models import User
 from app.auth.schemas import (
     LoginRequest,
@@ -32,8 +34,6 @@ from app.auth.service import (
 )
 from app.config import settings
 from app.core.database import get_db
-
-_bearer = HTTPBearer()
 
 router = APIRouter()
 
@@ -118,23 +118,28 @@ async def get_me(user: User = Depends(get_current_user)):
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
     body: LogoutRequest | None = None,
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """
     Revoke the current access token (and optionally the refresh token).
     Both tokens are added to the blacklist so they can't be reused.
+
+    `credentials` may be None in edge cases — get_current_user already enforces
+    that a valid token was present, so by the time we get here we always have one,
+    but the type hint matches dependencies._bearer (auto_error=False).
     """
     # Blacklist the access token from the Authorization header
-    try:
-        access_payload = decode_token(credentials.credentials)
-        access_jti = access_payload.get("jti")
-        if access_jti:
-            expires_at = datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc)
-            await blacklist_token(access_jti, "access", user.id, expires_at, db)
-    except JWTError:
-        pass  # Token was already validated by get_current_user
+    if credentials is not None:
+        try:
+            access_payload = decode_token(credentials.credentials)
+            access_jti = access_payload.get("jti")
+            if access_jti:
+                expires_at = datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc)
+                await blacklist_token(access_jti, "access", user.id, expires_at, db)
+        except JWTError:
+            pass  # Token was already validated by get_current_user
 
     # Optionally blacklist the refresh token too
     if body and body.refresh_token:
