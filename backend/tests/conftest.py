@@ -20,6 +20,8 @@ Fixtures:
 
 import uuid
 from collections.abc import AsyncGenerator
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -32,11 +34,20 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from app.agents.models import (
+    Agent,
+    AgentDefinition,
+    AgentIntegration,
+    AgentOrigin,
+    AgentStatus,
+    IntegrationType,
+)
 from app.auth.models import Organization, User, UserRole
 from app.auth.service import create_access_token, hash_password
 from app.core.database import Base, get_db
 from app.core.middleware import reset_rate_limit_state
 from app.main import app
+from app.tasks.models import Task, TaskStatus
 
 # Import ALL models so they register with Base.metadata before create_all runs.
 # Keep this list in sync with alembic/env.py.
@@ -209,3 +220,111 @@ async def second_auth_headers(second_user, second_org) -> dict[str, str]:
         second_user.id, second_org.id, second_user.role.value
     )
     return {"Authorization": f"Bearer {token}"}
+
+
+# ─── Agent fixtures (for task execution tests) ────────────────────────────────
+
+
+@pytest_asyncio.fixture
+async def internal_agent(db, test_org) -> Agent:
+    """An internal Claude-backed agent in test_org with a minimal definition."""
+    suffix = uuid.uuid4().hex[:8]
+    agent = Agent(
+        name=f"Internal Agent {suffix}",
+        slug=f"internal-{suffix}",
+        origin=AgentOrigin.INTERNAL,
+        status=AgentStatus.ACTIVE,
+        organization_id=test_org.id,
+    )
+    db.add(agent)
+    await db.flush()
+
+    definition = AgentDefinition(
+        agent_id=agent.id,
+        system_prompt="Eres un asistente de prueba. Responde brevemente.",
+        model_provider="anthropic",
+        model_name="claude-sonnet-4-5",
+        temperature=0.7,
+        max_tokens=1024,
+        tools=[],
+    )
+    db.add(definition)
+    await db.flush()
+    await db.refresh(agent, attribute_names=["definition"])
+    return agent
+
+
+@pytest_asyncio.fixture
+async def external_agent(db, test_org) -> Agent:
+    """An external webhook-backed agent in test_org."""
+    suffix = uuid.uuid4().hex[:8]
+    agent = Agent(
+        name=f"External Agent {suffix}",
+        slug=f"external-{suffix}",
+        origin=AgentOrigin.EXTERNAL,
+        status=AgentStatus.ACTIVE,
+        organization_id=test_org.id,
+    )
+    db.add(agent)
+    await db.flush()
+
+    integration = AgentIntegration(
+        agent_id=agent.id,
+        integration_type=IntegrationType.WEBHOOK,
+        platform="n8n",
+        endpoint_url="https://n8n.test.io/webhook/fake",
+    )
+    db.add(integration)
+    await db.flush()
+    await db.refresh(agent, attribute_names=["integration"])
+    return agent
+
+
+# ─── Claude API mock ──────────────────────────────────────────────────────────
+# We never want to hit the real Claude API in tests:
+# (1) it costs money on every CI run, (2) it's slow (10-60s), (3) responses
+# are non-deterministic. The fake_claude fixture patches `_get_client()` in the
+# agent_executor so internal task execution returns a canned response instantly.
+
+
+def _make_fake_claude_message(text: str = "Respuesta de prueba", input_tokens: int = 100, output_tokens: int = 50):
+    """
+    Build an object that quacks like an `anthropic.types.Message` for the parts
+    of the response the executor reads (.content, .stop_reason, .usage, .model).
+    """
+    text_block = SimpleNamespace(type="text", text=text)
+    return SimpleNamespace(
+        content=[text_block],
+        stop_reason="end_turn",
+        usage=SimpleNamespace(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        ),
+        model="claude-sonnet-4-5",
+        id=f"msg_test_{uuid.uuid4().hex[:8]}",
+        role="assistant",
+        type="message",
+    )
+
+
+@pytest_asyncio.fixture
+async def fake_claude(monkeypatch):
+    """
+    Patches `_get_client()` in agent_executor with a mock whose
+    `messages.create()` returns a deterministic Message-shaped response.
+
+    Default response: text="Respuesta de prueba", end_turn, 100/50 tokens.
+    Tests that need different responses can mutate `client.messages.create`
+    via the returned mock.
+    """
+    fake_message = _make_fake_claude_message()
+
+    fake_client = AsyncMock()
+    fake_client.messages.create = AsyncMock(return_value=fake_message)
+
+    # Replace `_get_client` so any module that calls it gets our fake
+    monkeypatch.setattr(
+        "app.workers.agent_executor._get_client",
+        lambda: fake_client,
+    )
+    yield fake_client
