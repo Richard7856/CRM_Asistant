@@ -9,7 +9,10 @@ from app.core.database import get_db
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.tasks.models import Task, TaskPriority, TaskStatus
 from app.tasks.schemas import TaskAssign, TaskCreate, TaskResponse, TaskUpdate
-from app.auth.dependencies import get_org_id
+from app.audit.models import AuditEventType
+from app.audit.service import log_audit_event
+from app.auth.dependencies import get_current_user, get_org_id
+from app.auth.models import User
 from app.tasks.service import TaskService
 from app.workers.agent_executor import execute_task_background
 from app.agents.models import Agent, Role, RoleLevel
@@ -51,8 +54,20 @@ async def list_tasks(
 async def create_task(
     data: TaskCreate,
     service: TaskService = Depends(_get_service),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await service.create_task(data)
+    task = await service.create_task(data)
+    await log_audit_event(
+        db, organization_id=user.organization_id,
+        event_type=AuditEventType.TASK_CREATED,
+        resource_type="task", resource_id=task.id,
+        actor_user_id=user.id,
+        input_payload={"title": data.title, "description": data.description},
+        context={"priority": data.priority.value if data.priority else None,
+                 "assigned_to": str(data.assigned_to) if data.assigned_to else None},
+    )
+    return task
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
@@ -85,6 +100,7 @@ async def assign_task(
 async def execute_task_endpoint(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Launch task execution in background — returns 202 immediately.
@@ -114,6 +130,20 @@ async def execute_task_endpoint(
 
     # Supervisors delegate to subordinates; regular agents execute directly
     is_supervisor = agent.role and agent.role.level in (RoleLevel.SUPERVISOR, RoleLevel.MANAGER)
+
+    # Audit BEFORE dispatching — we want the record even if the bg task crashes.
+    # The completion/failure events come from the worker (agent_executor.py).
+    await log_audit_event(
+        db, organization_id=user.organization_id,
+        event_type=AuditEventType.TASK_EXECUTED,
+        resource_type="task", resource_id=task.id,
+        actor_user_id=user.id,
+        input_payload={"title": task.title, "description": task.description},
+        context={
+            "agent_id": str(agent.id), "agent_name": agent.name,
+            "execution_path": "delegate" if is_supervisor else "execute",
+        },
+    )
 
     if is_supervisor:
         from app.workers.supervisor_delegator import delegate_task_background

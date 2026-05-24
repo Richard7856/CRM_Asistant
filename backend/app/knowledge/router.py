@@ -3,6 +3,8 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.audit.models import AuditEventType
+from app.audit.service import log_audit_event
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.core.database import get_db
@@ -41,7 +43,16 @@ async def ingest_document(
 ):
     """Ingest a document with pre-chunked content into the knowledge base."""
     svc = KnowledgeService(db, current_user.organization_id)
-    return await svc.ingest_document(payload, user_id=current_user.id)
+    doc = await svc.ingest_document(payload, user_id=current_user.id)
+    await log_audit_event(
+        db, organization_id=current_user.organization_id,
+        event_type=AuditEventType.DOCUMENT_UPLOADED,
+        resource_type="knowledge_document", resource_id=doc.id,
+        actor_user_id=current_user.id,
+        input_payload={"title": payload.title, "chunk_count": len(payload.chunks)},
+        context={"department_id": str(payload.department_id) if payload.department_id else None},
+    )
+    return doc
 
 
 @router.get("/search", response_model=list[KnowledgeSearchResult])
@@ -79,8 +90,16 @@ async def get_document(
 async def delete_document(
     doc_id: uuid.UUID,
     svc: KnowledgeService = Depends(_get_service),
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """Delete a knowledge document and all its chunks."""
     deleted = await svc.delete_document(doc_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found")
+    await log_audit_event(
+        db, organization_id=current_user.organization_id,
+        event_type=AuditEventType.DOCUMENT_DELETED,
+        resource_type="knowledge_document", resource_id=doc_id,
+        actor_user_id=current_user.id,
+    )

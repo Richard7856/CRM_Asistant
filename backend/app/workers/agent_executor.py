@@ -30,6 +30,8 @@ _API_TIMEOUT_SECONDS = 90  # hard cap — if Claude hasn't responded in 90s, fai
 
 from app.activities.models import ActivityLog, LogLevel
 from app.agents.models import Agent, AgentOrigin, AgentStatus, RoleLevel
+from app.audit.models import AuditEventType, AuditResult
+from app.audit.service import log_audit_event
 from app.config import settings
 from app.core.events import Event, event_bus
 from app.tasks.models import Task, TaskStatus
@@ -443,6 +445,23 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
             "tool_calls": len(tool_calls_log),
         })
 
+        # Audit: task completed. Hash the output text so an auditor can verify
+        # later "this exact output went out" without storing the full content.
+        await log_audit_event(
+            db, organization_id=agent.organization_id,
+            event_type=AuditEventType.TASK_COMPLETED,
+            resource_type="task", resource_id=task.id,
+            actor_agent_id=agent.id,
+            result=AuditResult.SUCCESS,
+            output_payload=output_text,
+            context={
+                "elapsed_ms": elapsed_ms,
+                "tokens": total_tokens,
+                "model": response.model,
+                "tool_calls": len(tool_calls_log),
+            },
+        )
+
         logger.info(
             "Task %s completed by agent %s in %dms (%d tokens, %d tool calls)",
             task.id, agent.name, elapsed_ms, total_tokens, len(tool_calls_log),
@@ -452,6 +471,21 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
         elapsed_ms = int((time.time() - start_time) * 1000)
         _mark_task_failed(task, agent, str(e), type(e).__name__, elapsed_ms)
         await db.flush()
+
+        # Audit: task failed. Hash the error message — no PII, but auditors can
+        # verify the same error pattern occurred at this exact time.
+        await log_audit_event(
+            db, organization_id=agent.organization_id,
+            event_type=AuditEventType.TASK_FAILED,
+            resource_type="task", resource_id=task.id,
+            actor_agent_id=agent.id,
+            result=AuditResult.FAILURE,
+            output_payload=str(e),
+            context={
+                "elapsed_ms": elapsed_ms,
+                "error_type": type(e).__name__,
+            },
+        )
 
         await _emit("task.failed", {
             "task_id": str(task.id), "title": task.title,

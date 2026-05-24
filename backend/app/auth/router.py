@@ -32,6 +32,8 @@ from app.auth.service import (
     refresh_tokens,
     register_user,
 )
+from app.audit.models import AuditEventType, AuditResult
+from app.audit.service import log_audit_event
 from app.config import settings
 from app.core.database import get_db
 
@@ -57,6 +59,22 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
+    # Audit: org creation + user creation
+    await log_audit_event(
+        db, organization_id=org.id,
+        event_type=AuditEventType.ORG_CREATED,
+        resource_type="organization", resource_id=org.id,
+        actor_user_id=user.id,
+        context={"org_name": org.name, "slug": org.slug},
+    )
+    await log_audit_event(
+        db, organization_id=org.id,
+        event_type=AuditEventType.USER_CREATED,
+        resource_type="user", resource_id=user.id,
+        actor_user_id=user.id,
+        context={"email": user.email, "role": user.role.value},
+    )
+
     access, _ = create_access_token(user.id, org.id, user.role.value)
     refresh, _ = create_refresh_token(user.id)
     return TokenResponse(
@@ -71,10 +89,22 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticate with email + password. Returns JWT tokens."""
     user = await authenticate_user(body.email, body.password, db)
     if user is None:
+        # Audit: failed login. We don't know the org (could be a probe attempt),
+        # but we record the attempted email in context for security analysis.
+        # Note: this requires committing in a separate session to persist —
+        # for now we skip (would need refactor of session lifecycle).
+        # TODO P0.8: record failed logins in a way that survives the rollback
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales invalidas",
         )
+
+    await log_audit_event(
+        db, organization_id=user.organization_id,
+        event_type=AuditEventType.LOGIN_SUCCESS,
+        actor_user_id=user.id,
+        context={"email": user.email},
+    )
 
     access, _ = create_access_token(user.id, user.organization_id, user.role.value)
     refresh, _ = create_refresh_token(user.id)
@@ -92,6 +122,22 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
         access, new_refresh = await refresh_tokens(body.refresh_token, db)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    # Decode the new access token to extract org_id + user_id for the audit entry
+    try:
+        new_payload = decode_token(access)
+        org_id_str = new_payload.get("org")
+        user_id_str = new_payload.get("sub")
+        if org_id_str and user_id_str:
+            import uuid as _uuid
+            await log_audit_event(
+                db, organization_id=_uuid.UUID(org_id_str),
+                event_type=AuditEventType.TOKEN_REFRESH,
+                actor_user_id=_uuid.UUID(user_id_str),
+            )
+    except (JWTError, ValueError, KeyError):
+        # Don't fail the refresh if audit fails — log was already-created tokens
+        pass
 
     return TokenResponse(
         access_token=access,
@@ -153,5 +199,11 @@ async def logout(
                     await blacklist_token(refresh_jti, "refresh", user.id, expires_at, db)
         except JWTError:
             pass  # Expired/invalid refresh token — nothing to blacklist
+
+    await log_audit_event(
+        db, organization_id=user.organization_id,
+        event_type=AuditEventType.LOGOUT,
+        actor_user_id=user.id,
+    )
 
     return MessageResponse(message="Sesion cerrada exitosamente")

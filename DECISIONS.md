@@ -511,3 +511,113 @@ Durante la validación post-limpieza, los tests presentaron flakiness ocasional:
 **Validación:** 15 tests del Vault verde + 69 tests previos = 84 tests verde sin regresiones.
 
 **Próximo bloque P0:** P0.2 — Audit log inmutable organization-wide (no solo de credentials).
+
+---
+
+## [2026-05-24] P0.2 — Audit log inmutable organization-wide
+
+**Contexto:** Después de P0.1 teníamos `credential_access_log` (audit específico de lectura de credenciales), pero faltaba la capa general que enterprise espera: **un solo lugar donde queda registrada CADA acción sensible** (humanas y de agentes) en formato exportable para auditores. Sin esto, no hay manera defendible de responder al CISO de HDI cuando pregunte "muéstrame todo lo que pasó en mi tenant la semana pasada". El 50% de proyectos agentic se quedan en piloto por falta exactamente de esta gobernanza (dato de mercado citado en el roadmap).
+
+**Decisión 1 — Dos tablas distintas, no una unificada:**
+
+| | `activity_logs` (ya existía) | `audit_log` (NUEVA) |
+|---|---|---|
+| Actor | Solo agentes (`agent_id` NOT NULL) | Humanos Y agentes |
+| Propósito | Bitácora operacional, dashboard, UX | Forensics + compliance |
+| Audiencia | Operadores internos | Auditores externos, CISO |
+| Inmutable | No | Sí (trigger DB bloquea UPDATE) |
+| Hash inputs/outputs | No | Sí (SHA-256) |
+| Exportable | No | Sí (CSV vía endpoint) |
+
+Considerada y descartada: refactor de `activity_logs` para que cumpla ambos roles. Razones:
+- Consumidores distintos con UX distinta — mezclarlos confunde a ambos lados
+- Cambiar el modelo de `activity_logs` rompe el frontend que ya consume sus endpoints
+- Separation of concerns más limpia y mantenible
+
+**Decisión 2 — 30 event types (no granular hasta el evento, no demasiado genérico):**
+
+Cubren auth (4), users/orgs (4), agentes (4), departments (3), tasks (5), credentials (3), knowledge (2), integrations (2), approvals placeholder (3). Esto cubre las promesas de la landing v2 sobre auditabilidad sin convertir el enum en algo inmantenible.
+
+Naming convention: `<domain>.<noun>.<verb_or_outcome>` — `auth.login.success`, `agent.created`, `task.executed`, etc.
+
+**Decisión 3 — Llamadas explícitas, NO decoradores ni middleware:**
+
+Tres opciones consideradas:
+
+| Opción | Descartada porque |
+|---|---|
+| Middleware automático | Muy mágico, no sabe quién/qué hizo, difícil de testear |
+| Decorador `@audit_action` | Requiere modificar cada service, abstrae lo que debería ser explícito |
+| **Llamadas manuales** ✅ | Muy claro, code review obvio, fácil de testear |
+
+Mitigación de "olvidar agregar log en endpoint nuevo": tests que verifican que cada endpoint sensible genera entrada.
+
+**Decisión 4 — Append-only enforced en DB (trigger PostgreSQL):**
+
+```sql
+CREATE TRIGGER no_update_audit_log
+    BEFORE UPDATE ON audit_log
+    FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_update();
+```
+
+**Defense in depth:** aunque un bug en código quiera modificar, la DB lo rechaza. Esto es lo que distingue un audit log "real" de uno "operacional" — la inmutabilidad es ley, no convención.
+
+**DELETE no se bloquea** a nivel DB porque se necesita para el retention policy (P0.7 LFPDPPP — 7 años default para banca/seguros, después se borra). DELETE bloqueado a nivel código (no exponemos endpoint que borre del audit log).
+
+**Decisión 5 — SHA-256 de inputs/outputs, NO almacenar contenido:**
+
+```python
+input_hash: String(64)  # SHA-256 hex digest
+output_hash: String(64)
+```
+
+Privacy by design: si la DB se filtra, los hashes no revelan PII. Pero auditores con el contenido original pueden verificar "este exacto valor pasó por el sistema el día X" (forensic confirmation).
+
+**Decisión 6 — Solo OWNER y ADMIN pueden leer el audit log:**
+
+Endpoint protegido con `Depends(require_role(UserRole.OWNER, UserRole.ADMIN))`. Member/Viewer obtienen 403. Razón: el audit_log puede contener IPs, user agents, referencias a otros usuarios — sensible.
+
+**Decisión 7 — `actor_user_id` opcional via constructor del service (credentials):**
+
+Para no contaminar TODOS los services con un nuevo parámetro obligatorio. El que necesite audit (CredentialService) acepta `actor_user_id` en el constructor, el resto de services (agents, tasks, departments, knowledge) hacen el audit a nivel router. Patrón híbrido pragmático.
+
+**Alcance del bloque (qué entra / qué NO):**
+
+✅ Entra: modelo + 30 event types + helper + trigger DB + 21 puntos de integración (auth + agents + tasks + executor + credentials + departments + knowledge) + endpoint GET filtrable + export CSV + role guard.
+
+❌ No entra:
+- Export PDF (P1.6 reportes ejecutivos)
+- UI frontend para visualizar (P2 multi-user UX)
+- Alertas automáticas de anomalías (P4 drift detection)
+- Retention policy automatizada (P0.7 LFPDPPP)
+- Integración SIEM externo (P4 enterprise)
+- Lógica de aprobación humana (P0.5 — las columnas `autonomy_level` y `approved_by_user_id` ya están listas)
+
+**Detalle de implementación que generó deuda menor:**
+
+Los enums de PostgreSQL en la migration manual usan VALUES (`'success'`, `'failure'`) pero `Base.metadata.create_all` en test DB los crea con NAMES (`'SUCCESS'`, `'FAILURE'`). Esto solo se manifiesta si se hace raw SQL con valores literales — el ORM funciona en ambos casos. **Anotado para resolver en P0.8 (CI/CD)** cuando estandaricemos cómo se manejan las migrations: o todo manual con psql, o todo via alembic generado, no mezcla.
+
+**El trigger PostgreSQL no es parte del schema ORM** — `Base.metadata.create_all` solo crea tablas e índices, no triggers. Fix: el conftest.py de tests ahora ejecuta el SQL del trigger después de `create_all` para que la test DB se comporte igual que prod. La migration alembic también lo crea via `op.execute()`.
+
+**Archivos creados/modificados (12 archivos):**
+
+Creados:
+- `app/audit/__init__.py`, `models.py`, `schemas.py`, `service.py`, `router.py`
+- `alembic/versions/e1f9d8c3b7a4_add_audit_log.py` (migration manual)
+- `tests/test_audit_log.py` (18 tests)
+
+Modificados:
+- `app/main.py` (mount router)
+- `alembic/env.py`, `tests/conftest.py` (import + trigger SQL)
+- `app/auth/router.py` (audit: register, login, refresh, logout)
+- `app/agents/router.py` (audit: create internal, register external, update, delete)
+- `app/tasks/router.py` (audit: create, execute)
+- `app/workers/agent_executor.py` (audit: complete, fail)
+- `app/credentials/service.py` (audit: create, update, delete + actor_user_id en constructor)
+- `app/credentials/router.py` (pasa actor_user_id al service)
+- `app/departments/router.py` (audit: create, update)
+- `app/knowledge/router.py` (audit: upload, delete)
+
+**Validación:** 18 tests del audit log verde + 84 tests previos = 102 tests verde sin regresiones.
+
+**Próximo bloque P0:** P0.3 — MCP Router con scope por área (el corazón del producto según la landing v2).

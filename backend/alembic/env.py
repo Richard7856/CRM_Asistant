@@ -29,6 +29,7 @@ from app.auth.models import Organization, User, TokenBlacklist  # noqa: F401
 from app.knowledge.models import KnowledgeDocument, KnowledgeChunk  # noqa: F401
 from app.credentials.models import Credential, CredentialAccessLog  # noqa: F401
 from app.notifications.models import Notification  # noqa: F401
+from app.audit.models import AuditLog  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

@@ -66,6 +66,7 @@ from app.auth.models import TokenBlacklist  # noqa: F401
 from app.knowledge.models import KnowledgeDocument, KnowledgeChunk  # noqa: F401
 from app.credentials.models import Credential, CredentialAccessLog  # noqa: F401
 from app.notifications.models import Notification  # noqa: F401
+from app.audit.models import AuditLog  # noqa: F401
 
 
 # Test database — separate from dev so a destructive test can never harm seed data.
@@ -101,6 +102,24 @@ async def test_engine():
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
+
+        # Triggers + DB-level constraints are NOT in the ORM metadata — we have
+        # to add them manually after create_all so the test DB matches what the
+        # alembic migrations produce in dev/prod.
+        # audit_log: append-only enforcement (blocks UPDATE).
+        await conn.execute(text("""
+            CREATE OR REPLACE FUNCTION prevent_audit_log_update()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                RAISE EXCEPTION 'audit_log is append-only — UPDATE is forbidden';
+            END;
+            $$ LANGUAGE plpgsql;
+        """))
+        await conn.execute(text("""
+            CREATE TRIGGER no_update_audit_log
+                BEFORE UPDATE ON audit_log
+                FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_update();
+        """))
     yield engine
     await engine.dispose()
 

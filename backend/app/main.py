@@ -28,6 +28,7 @@ from app.events.router import router as events_router
 from app.knowledge.router import router as knowledge_router
 from app.credentials.router import router as credentials_router
 from app.notifications.router import router as notifications_router
+from app.audit.router import router as audit_router
 
 # Import background workers
 from app.workers.metrics_calculator import run_metrics_calculator
@@ -139,6 +140,7 @@ app.include_router(prompts_router, prefix=f"{prefix}/prompts", tags=["prompts"],
 app.include_router(knowledge_router, prefix=f"{prefix}/knowledge", tags=["knowledge"], dependencies=_auth)
 app.include_router(credentials_router, prefix=f"{prefix}/credentials", tags=["credentials"], dependencies=_auth)
 app.include_router(notifications_router, prefix=f"{prefix}/notifications", tags=["notifications"], dependencies=_auth)
+app.include_router(audit_router, prefix=f"{prefix}/audit-log", tags=["audit"], dependencies=_auth)
 
 
 @app.get("/health")

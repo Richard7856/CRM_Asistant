@@ -9,7 +9,8 @@ import uuid
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_org_id
+from app.auth.dependencies import get_current_user, get_org_id
+from app.auth.models import User
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.dependencies import get_db
 from app.credentials.schemas import (
@@ -25,8 +26,11 @@ router = APIRouter()
 def _get_service(
     db: AsyncSession = Depends(get_db),
     org_id: uuid.UUID = Depends(get_org_id),
+    user: User = Depends(get_current_user),
 ) -> CredentialService:
-    return CredentialService(db, org_id)
+    # actor_user_id flows from JWT → service → audit_log so we know
+    # which human made each CRUD operation.
+    return CredentialService(db, org_id, actor_user_id=user.id)
 
 
 @router.post("/", response_model=CredentialResponse, status_code=201)

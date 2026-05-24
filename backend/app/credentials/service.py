@@ -18,6 +18,8 @@ from app.activities.models import ActivityLog  # noqa: F401
 from app.metrics.models import PerformanceMetric  # noqa: F401
 from app.interactions.models import AgentInteraction  # noqa: F401
 from app.improvements.models import ImprovementPoint  # noqa: F401
+from app.audit.models import AuditEventType
+from app.audit.service import log_audit_event
 from app.core.exceptions import NotFoundError
 from app.credentials.encryption import get_vault
 from app.credentials.models import Credential, CredentialAccessLog
@@ -55,9 +57,17 @@ def _to_response(cred: Credential) -> CredentialResponse:
 
 
 class CredentialService:
-    def __init__(self, db: AsyncSession, org_id: uuid.UUID) -> None:
+    def __init__(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        actor_user_id: uuid.UUID | None = None,
+    ) -> None:
         self.db = db
         self.org_id = org_id
+        # Optional — when set, audit log entries record this user as the actor.
+        # Defaults to None so existing service constructions still work.
+        self.actor_user_id = actor_user_id
         self.repo = CredentialRepository(db, org_id)
 
     async def create_credential(self, data: CredentialCreate) -> CredentialResponse:
@@ -78,6 +88,22 @@ class CredentialService:
         # Re-fetch with agent relationship loaded to populate agent_name
         created = await self.repo.get_by_id(credential.id)
         assert created is not None  # just flushed — must exist
+
+        await log_audit_event(
+            self.db, organization_id=self.org_id,
+            event_type=AuditEventType.CREDENTIAL_CREATED,
+            resource_type="credential", resource_id=created.id,
+            actor_user_id=self.actor_user_id,
+            input_payload={
+                "name": data.name,
+                "service_name": data.service_name,
+                "credential_type": data.credential_type.value,
+                "agent_id": str(data.agent_id) if data.agent_id else None,
+                # secret_value intentionally hashed — never raw
+                "secret_preview": credential.secret_preview,
+            },
+        )
+
         return _to_response(created)
 
     async def update_credential(
@@ -109,6 +135,21 @@ class CredentialService:
         # Re-fetch with relationships loaded
         updated = await self.repo.get_by_id(credential.id)
         assert updated is not None  # just flushed — must exist
+
+        # Track which fields actually changed (not just provided as not-None)
+        changed_fields = [
+            f for f in ("name", "credential_type", "service_name", "agent_id",
+                        "is_active", "notes", "secret_value")
+            if getattr(data, f) is not None
+        ]
+        await log_audit_event(
+            self.db, organization_id=self.org_id,
+            event_type=AuditEventType.CREDENTIAL_UPDATED,
+            resource_type="credential", resource_id=updated.id,
+            actor_user_id=self.actor_user_id,
+            context={"changed_fields": changed_fields},
+        )
+
         return _to_response(updated)
 
     async def get_credential(self, cred_id: uuid.UUID) -> CredentialResponse:
@@ -144,6 +185,15 @@ class CredentialService:
         credential = await self.repo.get_by_id(cred_id)
         if not credential:
             raise NotFoundError(f"Credential {cred_id} not found")
+
+        await log_audit_event(
+            self.db, organization_id=self.org_id,
+            event_type=AuditEventType.CREDENTIAL_DELETED,
+            resource_type="credential", resource_id=credential.id,
+            actor_user_id=self.actor_user_id,
+            context={"name": credential.name, "service_name": credential.service_name},
+        )
+
         await self.repo.delete(credential)
 
     async def get_credential_value(

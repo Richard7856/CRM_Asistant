@@ -11,7 +11,10 @@ from app.departments.schemas import (
     DepartmentTreeNode,
     DepartmentUpdate,
 )
-from app.auth.dependencies import get_org_id
+from app.audit.models import AuditEventType
+from app.audit.service import log_audit_event
+from app.auth.dependencies import get_current_user, get_org_id
+from app.auth.models import User
 from app.departments.service import DepartmentService
 
 router = APIRouter()
@@ -39,8 +42,18 @@ async def list_departments(
 async def create_department(
     data: DepartmentCreate,
     service: DepartmentService = Depends(_get_service),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await service.create_department(data)
+    dept = await service.create_department(data)
+    await log_audit_event(
+        db, organization_id=user.organization_id,
+        event_type=AuditEventType.DEPARTMENT_CREATED,
+        resource_type="department", resource_id=dept.id,
+        actor_user_id=user.id,
+        input_payload={"name": data.name, "description": data.description},
+    )
+    return dept
 
 
 @router.get("/tree", response_model=list[DepartmentTreeNode])
@@ -63,8 +76,19 @@ async def update_department(
     department_id: uuid.UUID,
     data: DepartmentUpdate,
     service: DepartmentService = Depends(_get_service),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await service.update_department(department_id, data)
+    dept = await service.update_department(department_id, data)
+    changed = [k for k, v in data.model_dump(exclude_unset=True).items() if v is not None]
+    await log_audit_event(
+        db, organization_id=user.organization_id,
+        event_type=AuditEventType.DEPARTMENT_UPDATED,
+        resource_type="department", resource_id=department_id,
+        actor_user_id=user.id,
+        context={"changed_fields": changed},
+    )
+    return dept
 
 
 @router.get("/{department_id}/agents")
