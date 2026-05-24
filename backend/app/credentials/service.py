@@ -19,7 +19,8 @@ from app.metrics.models import PerformanceMetric  # noqa: F401
 from app.interactions.models import AgentInteraction  # noqa: F401
 from app.improvements.models import ImprovementPoint  # noqa: F401
 from app.core.exceptions import NotFoundError
-from app.credentials.models import Credential
+from app.credentials.encryption import get_vault
+from app.credentials.models import Credential, CredentialAccessLog
 from app.credentials.repository import CredentialRepository
 from app.credentials.schemas import (
     CredentialCreate,
@@ -60,10 +61,13 @@ class CredentialService:
         self.repo = CredentialRepository(db, org_id)
 
     async def create_credential(self, data: CredentialCreate) -> CredentialResponse:
+        # Encrypt the secret BEFORE persisting. Plaintext never reaches the DB.
+        # The preview is generated from the plaintext (last 4 chars) — safe to show.
+        vault = get_vault()
         credential = Credential(
             name=data.name,
             credential_type=data.credential_type,
-            secret_value=data.secret_value,
+            secret_value=vault.encrypt(data.secret_value),
             service_name=data.service_name,
             agent_id=data.agent_id,
             notes=data.notes,
@@ -96,9 +100,9 @@ class CredentialService:
             credential.is_active = data.is_active
         if data.notes is not None:
             credential.notes = data.notes
-        # Secret update — re-mask preview
+        # Secret update — encrypt new value and re-mask preview from plaintext
         if data.secret_value is not None:
-            credential.secret_value = data.secret_value
+            credential.secret_value = get_vault().encrypt(data.secret_value)
             credential.secret_preview = _mask_secret(data.secret_value)
 
         await self.repo.update(credential)
@@ -141,3 +145,45 @@ class CredentialService:
         if not credential:
             raise NotFoundError(f"Credential {cred_id} not found")
         await self.repo.delete(credential)
+
+    async def get_credential_value(
+        self,
+        cred_id: uuid.UUID,
+        context: str,
+        agent_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+    ) -> str:
+        """
+        Decrypt and return the plaintext secret. ALWAYS logs the access.
+
+        This is the ONLY supported way to retrieve a plaintext credential.
+        Workers calling external APIs should use this method, not read
+        secret_value directly from the model.
+
+        Args:
+            cred_id: credential to read
+            context: human-readable WHY this access happened
+                     (e.g., "task_execution:task_<uuid>", "manual:owner_view")
+            agent_id: agent making the request (when programmatic)
+            user_id: user making the request (when manual)
+
+        Raises:
+            NotFoundError: credential doesn't exist or belongs to another org
+            cryptography.fernet.InvalidToken: ciphertext was tampered with
+        """
+        credential = await self.repo.get_by_id(cred_id)
+        if not credential:
+            raise NotFoundError(f"Credential {cred_id} not found")
+
+        # Audit FIRST, then decrypt. If we ever fail to log, we should not
+        # silently leak the secret — better to crash than to skip the trail.
+        log_entry = CredentialAccessLog(
+            credential_id=credential.id,
+            agent_id=agent_id,
+            user_id=user_id,
+            context=context[:200] if context else None,
+        )
+        self.db.add(log_entry)
+        await self.db.flush()
+
+        return get_vault().decrypt(credential.secret_value)

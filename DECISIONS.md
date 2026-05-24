@@ -471,3 +471,43 @@ Durante la validación post-limpieza, los tests presentaron flakiness ocasional:
 - Backend sin seeds activos en raíz (`backend/seed*.py` ya no existe)
 - `archived/` con todos los artefactos del demo viejo + README explicativo
 - Repo listo para arrancar P0 sin contaminación del producto anterior
+
+---
+
+## [2026-05-24] P0.1 — Vault para encriptación de credenciales at-rest
+
+**Contexto:** El campo `credentials.secret_value` se almacenaba en plaintext en PostgreSQL. Un docstring del modelo decía falsamente "encryption at rest via PostgreSQL", pero Postgres no encripta por default. Esto es bloqueante para enterprise: HDI no entrega API keys de Genesys/Dynamics si pueden leerse desde un backup. Es la primera tarea P0 del roadmap V3.1 porque sin ella, ninguna conversación de venta enterprise avanza.
+
+**Decisión:** Encriptación a nivel de aplicación con **Fernet** (AES-128-CBC + HMAC-SHA256 de la librería `cryptography`, ya instalada vía `python-jose[cryptography]`). Una sola key (`VAULT_ENCRYPTION_KEY`) por instancia, almacenada en `.env` separada del DB. Cuatro componentes:
+
+1. **`app/credentials/encryption.py`** — clase `Vault` con `encrypt()` / `decrypt()` + singleton `get_vault()` lazy-initialized + helper `reset_vault_for_tests()`.
+2. **`credentials.secret_value`** ahora guarda ciphertext (no plaintext). `secret_preview` sigue siendo los últimos 4 caracteres del plaintext (calculado antes de encriptar).
+3. **Función nueva `CredentialService.get_credential_value()`** — la ÚNICA forma soportada de obtener el plaintext. Decripta + crea entrada en `credential_access_log` ANTES de retornar. Si el log falla, el secret no se entrega.
+4. **Tabla `credential_access_log`** — append-only, registra `credential_id`, `agent_id` o `user_id`, `accessed_at`, `context` (free-form, ej: `"task_execution:task_<uuid>"`). Pertenece transitivamente al tenant del credential — no necesita su propio `organization_id`.
+
+**Alternativas consideradas:**
+
+| Opción | Por qué no |
+|---|---|
+| AWS KMS / GCP KMS | Rotación nativa + audit logs nativos, pero agrega dependencia externa, costo, y complejidad operativa que no se justifica en MVP. **Upgrade path documentado para Phase 5.** |
+| HashiCorp Vault (servicio) | Industry standard pero es un servicio extra a operar. Overkill para MVP. **Upgrade path para SOC 2 Type II (Phase 5).** |
+| Per-tenant encryption keys | Aislamiento máximo (filtración de cliente A no afecta B) pero complejidad alta para MVP (¿dónde se guardan N keys?). **Reconsiderar en Phase 5+ si SOC 2 lo exige.** |
+| Solo DB encryption (PostgreSQL TDE) | Transparente al código, pero NO protege contra: backup leak, empleado con acceso a DB, dump de la app con la key. Insuficiente como única defensa. Defense-in-depth para Phase 5. |
+| Caché de plaintext decryptado en memoria | Optimización que reduce decrypt-per-task de N a 1. **No incluido en P0.1** — encrypt/decrypt con Fernet toma ~50µs, no es bottleneck. Reconsiderar si se vuelve problema. |
+
+**Validación al iniciar (`config.py`):** Si `debug=False` y `vault_encryption_key` está vacío, el servidor crashea al arrancar con mensaje claro de cómo generar una key. Misma filosofía que la validación de `JWT_SECRET_KEY` agregada en Phase 5A — fallar rápido y visible es mejor que fallar silenciosamente.
+
+**Riesgos identificados:**
+- **Pérdida de la key = pérdida total de los secretos.** Mitigación: documentación en `.env.example` indicando backup separado del DB.
+- **Key rotation** — out-of-scope para P0.1. Planeado para Phase 5 (key versioning + re-encryption tool).
+- **Datos legados en plaintext** — en dev databases pueden quedar `secret_value` viejos sin encriptar. No los migramos automáticamente porque (a) son datos demo sin valor y (b) el demo se eliminó en la limpieza previa. En instalaciones reales, antes de deploy P0.1 se debe correr un script ad-hoc de re-encryption (futuro: incluir en `scripts/migrate_plaintext_credentials.py`).
+
+**Archivos tocados:**
+- Creados: `app/credentials/encryption.py`, `alembic/versions/d5e8f1c4a9b2_add_credential_access_log.py`, `tests/test_vault.py`, `backend/.env.example`
+- Modificados: `app/credentials/models.py` (+ `CredentialAccessLog`), `app/credentials/service.py` (encrypt en create/update + `get_credential_value()`), `app/config.py` (setting + validación), `alembic/env.py` (import del nuevo modelo), `tests/conftest.py` (import del nuevo modelo)
+
+**Decisión operativa sobre migrations:** Alembic `autogenerate` se cuelga consistentemente en este entorno (iCloud Drive + paths con espacios, problema documentado en CLAUDE.md). Por eso la migration se escribió a mano y se aplicó directo vía `psql` con `UPDATE alembic_version`. Funciona, pero no es repetible automáticamente para CI. En P0.8 (CI/CD) hay que decidir: (a) mover el repo fuera de iCloud, (b) usar un alembic alternativo, o (c) generar migrations a mano siempre. Por ahora, "a mano siempre" es la regla.
+
+**Validación:** 15 tests del Vault verde + 69 tests previos = 84 tests verde sin regresiones.
+
+**Próximo bloque P0:** P0.2 — Audit log inmutable organization-wide (no solo de credentials).

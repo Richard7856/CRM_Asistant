@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # LLM — used by the agent execution engine to run internal agents
     anthropic_api_key: str = ""
 
+    # Vault — symmetric encryption key for credentials at rest (Fernet).
+    # Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+    # Must be a 32-byte base64-encoded value. NEVER commit this to git.
+    vault_encryption_key: str = ""
+
 
 settings = Settings()
 
@@ -41,4 +46,15 @@ if not settings.debug and settings.jwt_secret_key == _INSECURE_JWT_DEFAULT:
         "FATAL: JWT_SECRET_KEY is still the default value. "
         "Set a secure secret via environment variable or .env file. "
         "Generate one with: openssl rand -hex 32"
+    )
+
+# Fail fast in production if the Vault encryption key is missing.
+# Without it, credentials cannot be encrypted/decrypted — better to crash than
+# to silently fall back to plaintext or to deny credential access in production.
+if not settings.debug and not settings.vault_encryption_key:
+    raise RuntimeError(
+        "FATAL: VAULT_ENCRYPTION_KEY is not set. "
+        "Credentials cannot be encrypted. "
+        "Generate one with: python -c 'from cryptography.fernet import Fernet; "
+        "print(Fernet.generate_key().decode())'"
     )
