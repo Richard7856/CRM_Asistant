@@ -418,3 +418,56 @@ Tokens emitidos antes de Phase 5A no tienen `jti`. El check de blacklist se salt
 
 **Archivos modificados:** `auth/models.py`, `auth/service.py`, `auth/dependencies.py`, `auth/router.py`, `auth/schemas.py`, `core/middleware.py`, `main.py`, `config.py`
 **Migration:** `3313605f6b2a_add_token_blacklist`
+
+---
+
+## [2026-05-24] Limpieza de demo DigitalMind y re-anclaje a landing v2
+
+**Contexto:** El primer demo del producto se construyó alrededor de una "agencia de marketing DigitalMind" con 3 departamentos y 8 agentes hardcodeados (Director de Contenido, Copywriter, Investigador, Account Manager, etc.). Cuando re-anclamos el roadmap a la landing v2 (target HDI Seguros + mid-market enterprise), este demo dejó de ser relevante. Los seeds y referencias podían contaminar el desarrollo del nuevo producto.
+
+**Decisión:** Limpieza estructurada en 3 categorías:
+
+1. **Archivar** (no borrar — pueden tener valor de referencia futura):
+   - `backend/seed.py` → `archived/seeds_v1_digitalmind/seed.py`
+   - `backend/seed_metrics.py` → `archived/seeds_v1_digitalmind/seed_metrics.py`
+   - `backend/seed_knowledge.py` → `archived/seeds_v1_digitalmind/seed_knowledge.py`
+   - `backend/seed_prompts.py` → `archived/seeds_v1_digitalmind/seed_prompts.py`
+   - `PHASE4_PLAN.md` → `archived/PHASE4_PLAN.md` (ya implementado en commit `f393194`)
+   - `ROADMAP.md` V2.1 y V3 → `archived/` (mantienen histórico de evolución del plan)
+
+2. **Borrar** (sin valor, riesgo de confusión):
+   - `AGENTS.md` (raíz) — era duplicado erróneo de `CLAUDE.md` que decía "Codex API" en lugar de "Claude API". Mantener dos archivos casi iguales confunde más que ayuda.
+
+3. **No tocar** (sigue siendo válido):
+   - Frontend completo (cero referencias hardcoded a DigitalMind — sorpresa positiva)
+   - Phase 5A security (token blacklist, rate limiting, etc.)
+   - Auth, multi-tenancy, tests (69 tests verde)
+   - Modelos core (Organization, User, Agent, Task, Department, Knowledge, Credentials)
+   - Webhook adapters genéricos (n8n, LangChain, CrewAI)
+   - DECISIONS.md, CLAUDE.md, README.md, SECURITY.md
+
+**Por qué archivar y no borrar los seeds:**
+- `seed_prompts.py` contiene templates genéricos (Marketing Digital, Ventas B2B, Soporte L1) que pueden ser semilla del catálogo de 30-50 agentes en P2.3
+- La estructura de delegación supervisor → especialistas de `seed.py` es válida — solo cambia el contexto de negocio (de agencia → aseguradora)
+- Los 4 roles base (admin/manager/supervisor/agent) de `seed.py` son punto de partida válido para P0.4 (RBAC granular)
+- Borrarlos perdería referencia histórica del primer demo funcional
+
+**Alternativas consideradas:**
+- Borrar todo sin archivar — más limpio pero pierde referencia útil
+- Mantener seeds activos en `backend/` con un flag "demo" — riesgo de que se ejecuten accidentalmente y contaminen la DB
+- Reescribir los seeds ahora para HDI — prematuro sin tener claros los agentes target
+
+**Hallazgo no resuelto (anotado para P0.8 — CI/CD):**
+Durante la validación post-limpieza, los tests presentaron flakiness ocasional: `test_register_creates_user_and_org` falló en 1 de 3 corridas consecutivas (otras 2 pasaron limpio 69/69). La causa probable es race condition en el rate limiter cuando dos tests ejecutan en rápida sucesión y la fixture autouse `_clean_rate_limit_state` no termina antes del siguiente test. **No fue causado por la limpieza** (la limpieza no tocó código de tests ni del rate limiter), es flakiness pre-existente. Cuando construyamos P0.8 (CI/CD), arreglarlo es prioridad — tests flaky bloquean merges y son inaceptables en pipeline de CI.
+
+**Archivos afectados:**
+- 4 archivos movidos a `archived/seeds_v1_digitalmind/`
+- 1 archivo movido a `archived/` (PHASE4_PLAN.md)
+- 1 archivo eliminado (AGENTS.md)
+- 1 archivo nuevo en archivado: `archived/seeds_v1_digitalmind/README.md` con instrucciones de cuándo volver a revisar cada seed
+
+**Estado post-limpieza:**
+- 69 tests verde (suite estable en 2 corridas consecutivas)
+- Backend sin seeds activos en raíz (`backend/seed*.py` ya no existe)
+- `archived/` con todos los artefactos del demo viejo + README explicativo
+- Repo listo para arrancar P0 sin contaminación del producto anterior

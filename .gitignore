@@ -41,5 +41,8 @@ postgres_data/
 *.db
 *.sqlite3
 
-# Local-only docs (no compartir — contienen analisis interno de seguridad)
+# Local-only docs (no compartir — contienen analisis interno y estrategia)
 SECURITY.md
+ROADMAP.md
+STATUS.md
+archived/
