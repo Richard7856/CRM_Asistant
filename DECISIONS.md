@@ -751,3 +751,142 @@ Modificados:
 3. Owner DELETE /admin/.../agents/{id} → siguiente POST /mcp/route → 403 (revocación instantánea verificada)
 
 **Próximo bloque P0:** P0.4 — RBAC granular por departamento (permisos read/aprobar/crear/eliminar por acción) o P0.5 — Sistema de aprobación humana con 4 niveles (Shadow + Auto + Co-piloto + Manual). Empezar por P0.5 tiene más valor de demo HDI; P0.4 puede esperar a tener UI multi-user.
+
+---
+
+## [2026-05-24] P0.5 — Sistema de aprobación humana con 4 niveles de autonomía
+
+**Contexto:** Cuarto bloque P0 (saltamos P0.4 a P0.5 por decisión de Richard — más valor de demo). Cumple LITERALMENTE la promesa central de la landing v2: *"Aprobación humana siempre. La IA prepara, el humano decide. Audit trail completo."* Sin esto, agentes operan en modo todo-o-nada. Con esto, el cliente configura por dept/agent/acción cuándo el humano interviene.
+
+**Los 4 niveles de autonomía:**
+
+| Nivel | Nombre | Comportamiento | Audit |
+|---|---|---|---|
+| 0 | SHADOW | Recibe inputs reales, NO ejecuta, registra lo que HABRÍA hecho | `SHADOW_ACTION_LOGGED` |
+| 1 | AUTO | Ejecuta sin preguntar, reversible | (request con status `AUTO_EXECUTED`) |
+| 2 | COPILOT | Ejecuta + notifica humano (in-app hoy, WhatsApp futuro) | (request con status `COPILOT_NOTIFIED`) |
+| 3 | MANUAL | Humano aprueba ANTES de ejecutar; task pausa en `WAITING_APPROVAL` | `APPROVAL_REQUESTED` → `APPROVAL_GRANTED`/`APPROVAL_REJECTED` |
+
+**Decisión 1 — Default Nivel 3 (MANUAL) cuando no hay política configurada:**
+
+Richard pidió probar este approach pero **documentar para revisión futura**. Razones:
+- Más seguro: si el admin no configuró nada, todo requiere aprobación humana
+- Aleja al producto de "ya funcionó por accidente, ahora descubrimos lo que se ejecutó solo"
+- Frustración aceptable porque el admin verá el output ("X requiere aprobación") y sabrá que debe configurar
+
+**Trade-off documentado para revisar:**
+- **Pro:** seguro por default. Cero acciones autónomas inesperadas.
+- **Contra:** primer uso de cada acción requiere intervención humana. Si el admin no configura políticas rápido, el agente queda bloqueado.
+- **Alternativa si esto frustra a HDI:** cambiar default a Nivel 2 (COPILOT) — el agente actúa pero notifica. Más ágil. Trade-off: requiere monitoreo activo.
+- **Punto de re-evaluación:** después del primer cliente piloto con HDI. Si el feedback es "tenemos que aprobar muchas cosas", bajar default. Si es "queremos más control", mantener.
+
+**Decisión 2 — `DELETE:*` hardcoded a Nivel 3, sin override:**
+
+```python
+if action.upper().startswith("DELETE:") or action == "DELETE":
+    return AutonomyLevel.MANUAL, "hardcoded:DELETE"
+```
+
+Aunque haya una política wildcard `*` → `AUTO`, los DELETEs SIEMPRE requieren aprobación. Razones:
+- Compliance enterprise: nunca borrar datos sin oversight humano
+- Test específico (`test_delete_action_is_always_manual_even_with_auto_policy`) lo verifica
+- Cumple regla explícita del ROADMAP V3.1: *"DELETE siempre Nivel 3 (no configurable)"*
+
+**Decisión 3 — Patrones simples (no regex):**
+
+- `*` = todo
+- `assign_task` = match exacto
+- `DELETE:*` = prefijo seguido de `:`
+
+Razones: regex completo es overkill para MVP, propenso a errores de admin escribiendo regex mal, y los 3 patrones cubren ~95% de casos. Si en P3+ se necesita más expresividad, se agrega.
+
+**Decisión 4 — Precedencia de scope en `resolve_level`:**
+
+Orden: `DELETE:*` hardcoded → `agent:<id>` → `dept:<id>` → `global` → default MANUAL.
+
+Dentro de un mismo scope, exact match beats prefix beats wildcard. Test parametrizado (`test_exact_action_pattern_beats_wildcard`) verifica.
+
+**Decisión 5 — Hook en `_execute_agent_tool` con excepciones tipadas:**
+
+En vez de cambiar el return type de `_execute_agent_tool` para incluir señales de pausa/rechazo, usé excepciones:
+- `ApprovalRequiredError` — Nivel 3, pausa el loop
+- `ApprovalRejectedError` — request previa rechazada, task termina REJECTED
+
+El caller (`_execute_internal`) las captura, marca el task con el status correcto, emite SSE event, y sale. **Patrón:** decisiones cognitivas son returns, control de flujo excepcional usa exceptions.
+
+**Decisión 6 — `task.status = WAITING_APPROVAL` pausa, reanuda en re-dispatch:**
+
+Cuando un Nivel 3 pausa, la task queda WAITING_APPROVAL y el executor sale limpio. Cuando humano aprueba, el frontend (P2 futuro) o admin manual debe re-disparar `/tasks/{id}/execute`. El executor detecta el ApprovalRequest APPROVED reciente (ventana 1h) y procede sin re-preguntar.
+
+**Pragmatismo:** En MVP no hay re-dispatch automático tras approve. Próximo bloque (probablemente P0.6 o P0.8 worker) implementa el auto-resume. Documentado como deuda técnica.
+
+**Decisión 7 — Idempotencia por (task_id, action):**
+
+`check_or_request` busca el ApprovalRequest más reciente para esa combinación. Si existe:
+- PENDING → wait (no duplicar)
+- APPROVED en última hora → execute
+- REJECTED → wait (la task ya está perdida, no hacer loop infinito)
+- APPROVED hace >1h → crea nuevo request (la aprobación caducó)
+
+Esto evita que el tool_use loop pida 50 aprobaciones idénticas si el LLM re-intenta.
+
+**Decisión 8 — UN solo commit grande en lugar de sub-commits:**
+
+Como discutimos en el plan: P0.5.1 a P0.5.4 son interdependientes para validar el flow end-to-end. Mejor un commit grande validado completamente que 4 commits parciales con riesgo de romper entre sí.
+
+**Decisión 9 — Notificaciones Nivel 2 son in-app (no WhatsApp/email todavía):**
+
+El módulo `notifications` existente cubre el caso in-app. Integración WhatsApp Business es P1.5. Email queda implícito en P1.5 también. **No bloquea P0.5 funcional.**
+
+**Decisión 10 — Worker que expira approvals viejos queda para P0.8:**
+
+ApprovalRequest tiene `expires_at` (default +24h) pero NO hay worker que ejecute la transición a EXPIRED. Está documentado y será 5to background worker en P0.8.
+
+**Lo que NO entra en P0.5 (deferido):**
+
+| Feature | A dónde va |
+|---|---|
+| Re-dispatch automático tras approve | P0.6 o P0.8 (worker que monitorea APPROVED + WAITING_APPROVAL combos) |
+| Worker de expiración | P0.8 (CI/CD + Ops) |
+| WhatsApp/email para Nivel 2 | P1.5 (WhatsApp Business integration) |
+| UI frontend de cola de aprobaciones | P2 (multi-user UX) — endpoints listos |
+| Sugerencia automática de bajar nivel tras N aprobaciones consecutivas | P3 — métrica + UI |
+| Reversión de Nivel 2 (deshacer dentro de ventana) | P1 o más tarde |
+| Approvals con scope por dept (department head approves) | P0.4 si lo hacemos, o P2 |
+
+**Archivos creados/modificados (10 archivos nuevos + ~6 modificados):**
+
+Creados:
+- `app/approvals/__init__.py`, `models.py`, `schemas.py`, `service.py`, `router.py`, `admin_router.py`
+- `alembic/versions/f6c9a1d4e5b2_add_approvals_and_autonomy.py`
+- `tests/test_approvals.py` (26 tests organizados en 6 clases)
+
+Modificados:
+- `app/audit/models.py` — 3 nuevos AuditEventType
+- `app/tasks/models.py` — 2 nuevos TaskStatus (`WAITING_APPROVAL`, `REJECTED`)
+- `app/workers/agent_executor.py` — hook P0.5 antes de `execute_tool()` + 2 nuevas excepciones tipadas + caller catch
+- `app/main.py` — montar 2 routers nuevos
+- `alembic/env.py`, `tests/conftest.py` — registrar nuevos modelos
+
+**Tablas + columnas en DB:**
+- `autonomy_policies` (8 columnas)
+- `approval_requests` (14 columnas)
+- 2 nuevos enums: `autonomylevel`, `approvalstatus`
+- 3 valores nuevos en `auditeventtype`
+- 2 valores nuevos en `taskstatus`
+
+**Validación:** 26 tests del bloque verde + 133 tests previos = **159 tests verde** sin regresiones.
+
+**Verificación end-to-end manual:**
+1. Admin crea política `(global, "*", AUTO)` → agentes ejecutan sin pedir
+2. Admin crea política `(agent:X, "DELETE:*", MANUAL)` → DELETE en agent X pausa task
+3. Admin aprueba via POST /approvals/{id}/approve → task se puede re-disparar y ejecuta
+4. Admin rechaza → task termina REJECTED, no se re-loopea
+
+**Promesas de la landing cumplidas:**
+- ✅ "La IA prepara, el humano decide" (Nivel 3)
+- ✅ "Audit trail completo" (cada decisión en `audit_log`)
+- ✅ "Shadow mode antes de producción" (Nivel 0)
+- ✅ "Autonomy escalable según confianza" (4 niveles configurables por scope)
+
+**Próximo bloque P0:** P0.6 — CEO Agent híbrido (pattern matching + LLM fallback) que reduce token usage en queries conocidas. Otra opción: P0.7 LFPDPPP compliance básico (right to be forgotten + retention policy). HDI requeriría P0.7 para firmar, P0.6 mejora la experiencia.

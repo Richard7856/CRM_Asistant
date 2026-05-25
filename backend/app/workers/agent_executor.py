@@ -30,11 +30,35 @@ _API_TIMEOUT_SECONDS = 90  # hard cap — if Claude hasn't responded in 90s, fai
 
 from app.activities.models import ActivityLog, LogLevel
 from app.agents.models import Agent, AgentOrigin, AgentStatus, RoleLevel
+from app.approvals.models import AutonomyLevel
+from app.approvals.service import ApprovalService
 from app.audit.models import AuditEventType, AuditResult
 from app.audit.service import log_audit_event
 from app.config import settings
 from app.core.events import Event, event_bus
 from app.tasks.models import Task, TaskStatus
+
+
+class ApprovalRequiredError(Exception):
+    """
+    Raised by _execute_agent_tool when the action requires human approval
+    (Level 3 MANUAL). The caller catches it, marks the task as
+    WAITING_APPROVAL, and exits the tool_use loop.
+    """
+
+    def __init__(self, approval_request_id: uuid.UUID, action: str):
+        self.approval_request_id = approval_request_id
+        self.action = action
+        super().__init__(f"Approval required for {action} (request {approval_request_id})")
+
+
+class ApprovalRejectedError(Exception):
+    """Raised when an existing approval request for this action was REJECTED."""
+
+    def __init__(self, approval_request_id: uuid.UUID, action: str):
+        self.approval_request_id = approval_request_id
+        self.action = action
+        super().__init__(f"Action {action} rejected (request {approval_request_id})")
 from app.workers.tool_definitions import get_tools_for_role
 from app.workers.tool_registry import ToolContext, execute_tool
 
@@ -349,14 +373,31 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
 
             # Execute each tool Claude requested and build tool_result messages
             tool_results_content = []
+            approval_paused = False
+            approval_rejected = False
+            paused_request_id = None
             for tool_block in tool_use_blocks:
-                tool_result = await _execute_agent_tool(
-                    tool_name=tool_block.name,
-                    tool_input=tool_block.input,
-                    agent=agent,
-                    task=task,
-                    db=db,
-                )
+                try:
+                    tool_result = await _execute_agent_tool(
+                        tool_name=tool_block.name,
+                        tool_input=tool_block.input,
+                        agent=agent,
+                        task=task,
+                        db=db,
+                    )
+                except ApprovalRequiredError as exc:
+                    # Level 3 MANUAL: pause the task and exit the loop.
+                    # When a human approves, a re-dispatch of this task will
+                    # find the APPROVED record and continue.
+                    approval_paused = True
+                    paused_request_id = exc.approval_request_id
+                    break
+                except ApprovalRejectedError as exc:
+                    # A prior request for this same action was REJECTED — terminate.
+                    approval_rejected = True
+                    paused_request_id = exc.approval_request_id
+                    break
+
                 tool_calls_log.append({
                     "tool": tool_block.name,
                     "input": tool_block.input,
@@ -368,6 +409,32 @@ async def _execute_internal(task: Task, agent: Agent, db: AsyncSession) -> None:
                     "tool_use_id": tool_block.id,
                     "content": json.dumps(tool_result, default=str),
                 })
+
+            # If any tool in this iteration triggered an approval pause/rejection,
+            # transition the task and exit the executor loop.
+            if approval_paused:
+                task.status = TaskStatus.WAITING_APPROVAL
+                agent.status = AgentStatus.IDLE
+                await db.flush()
+                await _emit("task.waiting_approval", {
+                    "task_id": str(task.id),
+                    "agent_id": str(agent.id),
+                    "approval_request_id": str(paused_request_id),
+                })
+                logger.info("Task %s paused for approval (request %s)", task.id, paused_request_id)
+                return
+            if approval_rejected:
+                task.status = TaskStatus.REJECTED
+                agent.status = AgentStatus.IDLE
+                task.completed_at = datetime.utcnow()
+                await db.flush()
+                await _emit("task.rejected", {
+                    "task_id": str(task.id),
+                    "agent_id": str(agent.id),
+                    "approval_request_id": str(paused_request_id),
+                })
+                logger.info("Task %s rejected (request %s)", task.id, paused_request_id)
+                return
 
             # Append Claude's response + our tool results to the conversation
             messages.append({"role": "assistant", "content": response.content})
@@ -704,6 +771,38 @@ async def _execute_agent_tool(
         task_id=task.id,
     )
 
+    # P0.5 hook: check the autonomy policy BEFORE executing the tool.
+    # Returns a decision; we act on it:
+    #   - execute      → run the tool normally (Levels 1 AUTO, 2 COPILOT, or reused APPROVED)
+    #   - shadow_skip  → return a fake result, never run the tool (Level 0 SHADOW)
+    #   - wait_approval → raise so the loop pauses the task (Level 3 MANUAL)
+    approval_service = ApprovalService(db, agent.organization_id)
+    decision = await approval_service.check_or_request(
+        agent=agent,
+        action=tool_name,
+        action_input=tool_input,
+        task_id=task.id,
+    )
+
+    if decision.action_to_take == "shadow_skip":
+        # Level 0: return a sentinel — the LLM in the next turn will see it
+        # and understand the action wasn't really executed. Audit log already
+        # registered the simulation via SHADOW_ACTION_LOGGED.
+        return {
+            "shadow_mode": True,
+            "would_have_called": tool_name,
+            "with_input": tool_input,
+            "note": "Action recorded in shadow mode — not actually executed.",
+        }
+
+    if decision.action_to_take == "wait_approval":
+        # Level 3: bubble up so the executor loop can pause the task.
+        # Differentiate reused-rejected from fresh-pending if needed:
+        if decision.matched_scope == "reused_rejected":
+            raise ApprovalRejectedError(decision.approval_request_id, tool_name)
+        raise ApprovalRequiredError(decision.approval_request_id, tool_name)
+
+    # action_to_take == "execute" — proceed with the real tool call
     result = await execute_tool(tool_name, tool_input, ctx)
 
     # Log the autonomous action for audit trail

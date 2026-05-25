@@ -85,6 +85,11 @@ class AuditEventType(str, enum.Enum):
     MCP_PERMISSION_GRANTED = "mcp.permission.granted"
     MCP_PERMISSION_REVOKED = "mcp.permission.revoked"
 
+    # ─── Approval system (P0.5) ───
+    APPROVAL_EXPIRED = "approval.expired"
+    SHADOW_ACTION_LOGGED = "shadow.action.logged"
+    AUTONOMY_POLICY_CHANGED = "autonomy.policy.changed"
+
 
 class AuditResult(str, enum.Enum):
     SUCCESS = "success"

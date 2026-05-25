@@ -13,9 +13,13 @@ class TaskStatus(str, enum.Enum):
     PENDING = "pending"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
+    # P0.5: pauses the executor mid-tool-use loop while a human approves
+    WAITING_APPROVAL = "waiting_approval"
     REVIEW = "review"
     COMPLETED = "completed"
     FAILED = "failed"
+    # P0.5: human rejected an approval mid-flow — task ends here
+    REJECTED = "rejected"
     CANCELLED = "cancelled"
 
 
