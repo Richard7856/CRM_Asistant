@@ -67,6 +67,7 @@ from app.knowledge.models import KnowledgeDocument, KnowledgeChunk  # noqa: F401
 from app.credentials.models import Credential, CredentialAccessLog  # noqa: F401
 from app.notifications.models import Notification  # noqa: F401
 from app.audit.models import AuditLog  # noqa: F401
+from app.mcp.models import DepartmentAgentPermission, DepartmentToolPermission  # noqa: F401
 
 
 # Test database — separate from dev so a destructive test can never harm seed data.

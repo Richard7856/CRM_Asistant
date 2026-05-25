@@ -29,6 +29,8 @@ from app.knowledge.router import router as knowledge_router
 from app.credentials.router import router as credentials_router
 from app.notifications.router import router as notifications_router
 from app.audit.router import router as audit_router
+from app.mcp.router import router as mcp_router
+from app.mcp.admin_router import router as mcp_admin_router
 
 # Import background workers
 from app.workers.metrics_calculator import run_metrics_calculator
@@ -141,6 +143,8 @@ app.include_router(knowledge_router, prefix=f"{prefix}/knowledge", tags=["knowle
 app.include_router(credentials_router, prefix=f"{prefix}/credentials", tags=["credentials"], dependencies=_auth)
 app.include_router(notifications_router, prefix=f"{prefix}/notifications", tags=["notifications"], dependencies=_auth)
 app.include_router(audit_router, prefix=f"{prefix}/audit-log", tags=["audit"], dependencies=_auth)
+app.include_router(mcp_router, prefix=f"{prefix}/mcp", tags=["mcp"], dependencies=_auth)
+app.include_router(mcp_admin_router, prefix=f"{prefix}/admin", tags=["mcp-admin"], dependencies=_auth)
 
 
 @app.get("/health")

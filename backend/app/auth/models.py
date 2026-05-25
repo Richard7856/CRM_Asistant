@@ -57,6 +57,14 @@ class User(Base):
         UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False
     )
 
+    # Department the user belongs to (P0.3 MCP Router scope per area).
+    # Nullable because OWNER/ADMIN don't need a department — they have org-wide access.
+    # MEMBER/VIEWER must have a department assigned to use the MCP Router.
+    # Service layer enforces that department.organization_id == user.organization_id.
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True, index=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
@@ -64,6 +72,7 @@ class User(Base):
 
     # Relationships
     organization: Mapped[Organization] = relationship(back_populates="users")
+    department = relationship("Department", foreign_keys=[department_id])
 
 
 class TokenBlacklist(Base):

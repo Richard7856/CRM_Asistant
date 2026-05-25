@@ -621,3 +621,133 @@ Modificados:
 **Validación:** 18 tests del audit log verde + 84 tests previos = 102 tests verde sin regresiones.
 
 **Próximo bloque P0:** P0.3 — MCP Router con scope por área (el corazón del producto según la landing v2).
+
+---
+
+## [2026-05-24] P0.3 — MCP Router con scope por área (gateway de acceso enterprise)
+
+**Contexto:** Tercer bloque P0. Es **el corazón del producto vendible** según la landing v2: *"MCP Router que reparte el acceso por área"*. Sin esto, el producto es un orquestador genérico más — no diferencia frente a Dify/Flowise. Con esto, somos la capa de gobernanza enterprise que enterprise mid-market exige.
+
+**El gap fundamental que había que cerrar primero:** los `User` solo tenían `organization_id` — no había forma de saber a qué área (departamento) pertenecía un user dentro del tenant. Sin eso, el Router no podía "repartir por área". Agregar `users.department_id` (FK nullable) fue prerequisito sin alternativa real.
+
+**Decisión arquitectónica principal — el Router NO es el cerebro:**
+
+Discutido en sesión previa con Richard (ver entradas anteriores): el MCP Router es **capa pasiva de control de acceso + audit**, NO el cerebro cognitivo. Cuatro responsabilidades:
+1. Identificar quién pregunta (vía JWT, ya hecho por dependencias)
+2. Resolver scope (qué agentes/tools puede invocar)
+3. Auditar la decisión (MCP_ROUTE_REQUESTED / MCP_ROUTE_DENIED)
+4. Despachar al supervisor del departamento (delegación cognitiva en supervisor_delegator.py existente)
+
+Lo que **NO hace el Router** (responsabilidades de otros componentes):
+- Descomposición de tareas → supervisor del dept
+- Decisión plan-vs-ejecución → CEO Agent (P0.6, P1.2)
+- Razonamiento sobre el query → LLM detrás del supervisor
+
+**Decisión 2 — Modelo de scope: dos tablas separadas (agentes + tools):**
+
+| | `department_agent_permissions` | `department_tool_permissions` |
+|---|---|---|
+| PK compuesta | `(dept_id, agent_id)` | `(dept_id, tool_name)` |
+| FK agent_id | sí (ondelete CASCADE) | n/a |
+| tool_name | n/a | String(100) — match con `@register_tool(name)` |
+| granted_by_user_id + granted_at | sí (auditoría informal) | sí |
+
+Considerada y descartada: una sola tabla "permissions" con tipo + scope_id polimórfico. Más limpio tener dos tablas estrictas (cada una con FK fuerte). Más fácil de hacer queries con JOIN para "qué agents puede invocar este dept".
+
+**Decisión 3 — Scope es lista blanca, no lista negra:**
+
+Por defecto: dept nuevo NO puede invocar nada. Owner/Admin debe otorgar explícitamente. Más seguro y más enterprise-friendly que el reverso ("todo permitido, prohibir uno por uno").
+
+OWNER/ADMIN bypasean el scope check vía `UserScope.is_org_wide=True`. Lógica en `ScopeService.resolve_scope_for_user()`: si `user.role in (OWNER, ADMIN)`, retorna scope org-wide sin tocar las tablas de permisos.
+
+**Decisión 4 — Sin caché de scopes — promesa "revocable al instante":**
+
+Cada call a `/mcp/route` consulta DB fresh. Trade-off: ~5ms extra por request a cambio de la promesa explícita de la landing *"permisos revocables al instante"*. Sin esto, un admin que revoca por incidente tendría que esperar a que expire la caché (segundos o minutos). Inaceptable para enterprise.
+
+Test específico (`TestRevocationIsInstant`) verifica que un DELETE en `/admin/departments/{id}/scopes/agents/{aid}` hace que el SIGUIENTE call a `/mcp/route` devuelva 403. No "next minute", "next request".
+
+**Decisión 5 — Reusar supervisor del dept en lugar de crear "CEO Agent" nuevo:**
+
+La landing menciona "CEO Agent" pero el sistema ya tiene supervisores per-dept funcionando (`supervisor_delegator.py`, 495 líneas, con tool_use para delegación). Crear un CEO Agent nuevo en P0.3 sería:
+- Duplicar funcionalidad existente
+- Mezclar P0.3 (acceso) con P0.6 (cerebro híbrido)
+- Aumentar el blast radius de un cambio crítico
+
+**P0.3 usa supervisor del dept. P0.6 (futuro) introducirá CEO Agent híbrido con pattern matching.**
+
+`_find_department_supervisor()` busca primero `department.head_agent_id`, fallback a cualquier agente del dept con role.level en (SUPERVISOR, MANAGER, ADMIN), excluyendo agents en ERROR/OFFLINE. Si no encuentra → 503 con mensaje claro.
+
+**Decisión 6 — División en 3 sub-commits (3.1, 3.2, 3.3):**
+
+Por tamaño y separabilidad lógica:
+- **3.1 Foundation** (modelos + scope storage + service): commit independiente, no requiere endpoint para validar
+- **3.2 Endpoint /mcp/route + integración**: depende de 3.1
+- **3.3 Admin endpoints + UI backend**: independiente de 3.2 (puedes administrar scopes sin que el endpoint esté listo)
+
+Hubo dilema de hacer 1 sub-commit o 3 — decidí los 3 SE FUSIONAN en UN solo commit final porque trabajamos linealmente y los tests dependen del módulo completo. La separación queda en `git log` con la frase "P0.3.X" en el body del commit message para futura referencia.
+
+**Decisión 7 — `task.created_by` queda NULL para tasks creados desde Router:**
+
+`tasks.created_by` es FK a `agents.id` (no users.id) — diseño legacy. Una task creada por un USER humano vía Router tiene `created_by=NULL` legítimamente. La traceabilidad va por `audit_log.actor_user_id` (que ya capturamos en MCP_ROUTE_REQUESTED).
+
+Anotado como deuda técnica: en P0.5 o más tarde, ampliar el modelo Task con `created_by_user_id` separado para casos donde el creador es humano. No urgente.
+
+**Decisión 8 — `target_department_id` opcional en el body:**
+
+OWNER/ADMIN sin departamento asignado pueden especificar `target_department_id` para dispatch a cualquier dept del org. MEMBER que intente targetear otro dept → 403 (audit denied con razón `member_cannot_target_other_department`).
+
+Caso edge: OWNER con `department_id` SET y target distinto — permitido (el owner es supervisor de TODO). El check `user.role not in (OWNER, ADMIN)` aplica solo a member/viewer.
+
+**Decisión 9 — `await db.commit()` removido del endpoint:**
+
+Inicial draft tenía `await db.commit()` antes del `asyncio.create_task(delegate_task_background(...))`. Razón intuitiva: el background task abre su propia session y no vería la task si no está commiteada.
+
+Pero esto rompe la transacción de tests (que usan rollback). La fix: confiar en que `get_db()` ya commitea al final del request, y `asyncio.create_task` programa la coroutine pero NO la ejecuta inmediatamente — el event loop la ejecuta DESPUÉS del commit del request. Funciona en prod (task visible para background) y en tests (rollback intacto).
+
+**Decisión 10 — 4 audit events nuevos:**
+
+```python
+MCP_ROUTE_REQUESTED = "mcp.route.requested"      # toda petición exitosa
+MCP_ROUTE_DENIED = "mcp.route.denied"            # rechazado por scope o config
+MCP_PERMISSION_GRANTED = "mcp.permission.granted" # admin otorgó scope
+MCP_PERMISSION_REVOKED = "mcp.permission.revoked" # admin revocó scope
+```
+
+Cada uno con `input_hash` del query (privacy) + context rico (department, supervisor, scope size).
+
+**Lo que NO entra en P0.3 (documentado explícitamente):**
+- UI frontend para configurar scopes (P2 multi-user UX — endpoints listos)
+- 4 niveles de autonomía Shadow + Auto + Co-piloto + Manual (P0.5)
+- Pattern matching del CEO Agent (P0.6)
+- MCP routers externos: Composio, Pipedream, Zapier (P7)
+- Modo plan-vs-ejecución (P1.2 — no es P0)
+- LLM local routing (P5)
+
+**Archivos creados/modificados (10 archivos):**
+
+Creados:
+- `app/mcp/__init__.py`, `models.py`, `schemas.py`, `service.py`, `router.py`, `admin_router.py`
+- `alembic/versions/e8d4a2b1f3c5_add_user_department_and_mcp_scopes.py`
+- `tests/test_mcp_scopes.py` (13 tests del foundation)
+- `tests/test_mcp_router.py` (18 tests del endpoint + admin + revocación instantánea)
+
+Modificados:
+- `app/auth/models.py` — agregar `User.department_id` (FK nullable)
+- `app/audit/models.py` — 4 nuevos AuditEventType
+- `app/main.py` — montar mcp_router + mcp_admin_router
+- `alembic/env.py`, `tests/conftest.py` — registrar nuevos modelos
+
+**Tablas + columnas en DB:**
+- `users.department_id` (FK nullable a departments)
+- `department_agent_permissions` (PK compuesta)
+- `department_tool_permissions` (PK compuesta)
+- 4 nuevos valores en enum `auditeventtype`
+
+**Validación:** 13 tests del foundation + 18 tests del endpoint = 31 tests del bloque verde. Suite completa 133/133 sin regresiones.
+
+**Verificación end-to-end manual:**
+1. Owner crea dept "Marketing" → POST /admin/departments/{id}/scopes/agents para grant supervisor → POST /mcp/route con target_dept_id → 202 con task_id
+2. Member del dept con scope vacío → POST /mcp/route → 403 (scope vacío) + audit MCP_ROUTE_DENIED en DB
+3. Owner DELETE /admin/.../agents/{id} → siguiente POST /mcp/route → 403 (revocación instantánea verificada)
+
+**Próximo bloque P0:** P0.4 — RBAC granular por departamento (permisos read/aprobar/crear/eliminar por acción) o P0.5 — Sistema de aprobación humana con 4 niveles (Shadow + Auto + Co-piloto + Manual). Empezar por P0.5 tiene más valor de demo HDI; P0.4 puede esperar a tener UI multi-user.

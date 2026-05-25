@@ -79,6 +79,12 @@ class AuditEventType(str, enum.Enum):
     APPROVAL_GRANTED = "approval.granted"
     APPROVAL_REJECTED = "approval.rejected"
 
+    # ─── MCP Router (P0.3) ───
+    MCP_ROUTE_REQUESTED = "mcp.route.requested"
+    MCP_ROUTE_DENIED = "mcp.route.denied"
+    MCP_PERMISSION_GRANTED = "mcp.permission.granted"
+    MCP_PERMISSION_REVOKED = "mcp.permission.revoked"
+
 
 class AuditResult(str, enum.Enum):
     SUCCESS = "success"
