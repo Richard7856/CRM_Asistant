@@ -33,6 +33,7 @@ from app.mcp.router import router as mcp_router
 from app.mcp.admin_router import router as mcp_admin_router
 from app.approvals.router import router as approvals_router
 from app.approvals.admin_router import router as approvals_admin_router
+from app.compliance.admin_router import router as compliance_admin_router
 
 # Import background workers
 from app.workers.metrics_calculator import run_metrics_calculator
@@ -149,6 +150,7 @@ app.include_router(mcp_router, prefix=f"{prefix}/mcp", tags=["mcp"], dependencie
 app.include_router(mcp_admin_router, prefix=f"{prefix}/admin", tags=["mcp-admin"], dependencies=_auth)
 app.include_router(approvals_router, prefix=f"{prefix}/approvals", tags=["approvals"], dependencies=_auth)
 app.include_router(approvals_admin_router, prefix=f"{prefix}/admin", tags=["approvals-admin"], dependencies=_auth)
+app.include_router(compliance_admin_router, prefix=f"{prefix}/admin", tags=["compliance"], dependencies=_auth)
 
 
 @app.get("/health")

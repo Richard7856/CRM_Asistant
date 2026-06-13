@@ -32,6 +32,7 @@ from app.notifications.models import Notification  # noqa: F401
 from app.audit.models import AuditLog  # noqa: F401
 from app.mcp.models import DepartmentAgentPermission, DepartmentToolPermission  # noqa: F401
 from app.approvals.models import ApprovalRequest, AutonomyPolicy  # noqa: F401
+from app.compliance.models import ErasureCertificate  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

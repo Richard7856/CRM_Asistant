@@ -90,6 +90,15 @@ class AuditEventType(str, enum.Enum):
     SHADOW_ACTION_LOGGED = "shadow.action.logged"
     AUTONOMY_POLICY_CHANGED = "autonomy.policy.changed"
 
+    # ─── Compliance / LFPDPPP (P0.7) ───
+    # TENANT_ERASED is defined for symmetry but is NOT written to audit_log —
+    # a tenant erasure deletes its own audit_log, so the durable record is the
+    # ErasureCertificate instead. USER_ERASED and DATA_EXPORTED keep the org alive
+    # and are logged normally.
+    TENANT_ERASED = "compliance.tenant.erased"
+    USER_ERASED = "compliance.user.erased"
+    DATA_EXPORTED = "compliance.data.exported"
+
 
 class AuditResult(str, enum.Enum):
     SUCCESS = "success"

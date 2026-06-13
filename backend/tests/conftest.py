@@ -69,6 +69,7 @@ from app.notifications.models import Notification  # noqa: F401
 from app.audit.models import AuditLog  # noqa: F401
 from app.mcp.models import DepartmentAgentPermission, DepartmentToolPermission  # noqa: F401
 from app.approvals.models import ApprovalRequest, AutonomyPolicy  # noqa: F401
+from app.compliance.models import ErasureCertificate  # noqa: F401
 
 
 # Test database — separate from dev so a destructive test can never harm seed data.
@@ -121,6 +122,22 @@ async def test_engine():
             CREATE TRIGGER no_update_audit_log
                 BEFORE UPDATE ON audit_log
                 FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_update();
+        """))
+
+        # erasure_certificates: a proof of erasure must never be altered OR
+        # deleted (P0.7) — block both. Mirrors the migration.
+        await conn.execute(text("""
+            CREATE OR REPLACE FUNCTION prevent_erasure_certificate_change()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                RAISE EXCEPTION 'erasure_certificates is immutable — % is forbidden', TG_OP;
+            END;
+            $$ LANGUAGE plpgsql;
+        """))
+        await conn.execute(text("""
+            CREATE TRIGGER no_change_erasure_certificates
+                BEFORE UPDATE OR DELETE ON erasure_certificates
+                FOR EACH ROW EXECUTE FUNCTION prevent_erasure_certificate_change();
         """))
     yield engine
     await engine.dispose()

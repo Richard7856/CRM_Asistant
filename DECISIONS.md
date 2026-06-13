@@ -918,3 +918,29 @@ Modificados:
 - El digest Shadow (A2) puede prometer de más en ventas si los agentes en Shadow alucinan acciones que no podrían ejecutar realmente — revisar calidad antes de mostrarlo a HDI.
 
 **Improvement opportunities:** Landing v3 con la promesa "la agencia trabaja aunque nadie pida"; trust score (A6) para automatizar la promoción de niveles; pricing del modo operado (pendiente con primer prospecto); naming del producto (el concepto "agencia" podría entrar al nombre).
+
+---
+
+## [2026-06-12] P0.7 — Compliance LFPDPPP (derecho al olvido + acceso + clasificación)
+
+**Context:** P0.7 es BLOQUEANTE para cerrar HDI e insumo directo de ISO 27001. La LFPDPPP (vigente desde 2010) exige derecho al olvido, derecho de acceso/portabilidad y clasificación de datos. Al explorar el código encontramos que **borrar un tenant ni siquiera funcionaba**: ~15 tablas referencian `organizations.id` sin `ON DELETE CASCADE`, así que `DELETE FROM organizations` falla por violación de FK.
+
+**Decision:** Módulo nuevo `app/compliance/` con tres derechos:
+1. **Derecho al olvido (tenant)** vía **borrado ordenado en el servicio** (no CASCADE schema-wide): null-breakers para los ciclos (agents↔departments, self-refs), borrado en orden de dependencia (FK-holders primero, hijos con CASCADE caen solos), org al final. Se cuenta cada fila antes de borrar → **certificado de borrado inmutable** (tabla `erasure_certificates`, sin FK a organizations para sobrevivir al borrado, trigger que bloquea UPDATE *y* DELETE). Verificación post-borrado re-cuenta y aborta (rollback atómico) si algo sobrevivió. Confirmación = escribir el slug de la org; solo OWNER; siempre la propia org del caller (no se puede borrar otra).
+2. **Derecho al olvido (usuario)** vía **anonimización en su lugar**, no borrado duro — porque `knowledge_documents.created_by_user_id` es NOT NULL y borrar destruiría registros de negocio de la org. Se hace auditable (`USER_ERASED`).
+3. **Derecho de acceso/portabilidad:** export JSON tenant + por-usuario con manifiesto de clasificación.
+4. **Registro de clasificación** (`classification.py`) como única fuente de verdad de qué es PII/operacional/metadata; un test falla si se agrega una tabla con `organization_id` sin cablearla. Insumo del futuro Track L / L2 (ruteo LLM por sensibilidad).
+
+**Alternatives considered:**
+- *CASCADE schema-wide vía migración:* menos código, pero convierte cualquier borrado accidental de org en wipe total silencioso y no permite contar filas para el certificado sin consultar antes. Richard eligió borrado ordenado explícito (más deliberado y auditable).
+- *Borrado duro de usuarios:* rompería FKs NOT NULL o exigiría borrar datos de la org. Anonimizar cumple LFPDPPP (persona deja de ser identificable) sin destruir registros legítimos.
+- *Backup + retention en este bloque:* se sacaron — backup es ops (P0.8), retention es fast-follow (P0.7b). Mantener el bloque coherente (compliance, no ops).
+
+**Risks/Limitations:**
+- Tras borrar un tenant no hay usuario que autentique para consultar su certificado; se devuelve en la respuesta del erase y persiste en DB. Falta vista platform-superadmin.
+- El borrado ordenado depende de una lista de tablas mantenida a mano; mitigado por el test de cobertura que falla si aparece una tabla `organization_id` no cableada.
+- Deuda enum NAMES vs VALUES: migrations viejas crearon `auditeventtype` con VALUES (lowercase) pero SQLAlchemy bindea NAMES (uppercase) — inconsistencia latente en dev (verificado empíricamente). P0.7 usa NAMES (correcto); limpiar lo viejo en P0.8.
+
+**Validación:** 10 tests nuevos (clasificación, export, erase-tenant happy/wrong-confirmation/isolation/role, anonimización, inmutabilidad del certificado) → **169 tests verde** sin regresiones. Migration `a7e2c9f4b1d8` aplicada a dev a mano (alembic se cuelga en iCloud).
+
+**Improvement opportunities:** P0.7b retention policy + worker; platform-superadmin para certificados; limpiar deuda enum en P0.8; usar la clasificación para L2 cuando lleguemos al Track L.
