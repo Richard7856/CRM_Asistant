@@ -975,3 +975,30 @@ Modificados:
 **Validación:** 5 tests nuevos (`test_ops.py`: health, expiración ×2, failed-login ×2) → **174 verde**. Ruff limpio en `app tests`. Backup+restore probado end-to-end (dump cifrado → restore en DB scratch → datos verificados).
 
 **Improvement opportunities:** cron de backup + offsite cuando exista AWS; status page (P1.10); migrar scheduler a proceso separado en A1; recreate limpio de enums cuando haya prod.
+
+---
+
+## [2026-06-13] P0.7b — Retention worker (cierra el último pendiente de LFPDPPP)
+
+**Context:** P0.7 dejó la retención de datos como fast-follow. LFPDPPP exige no conservar datos personales más allá de lo necesario. Faltaba el mecanismo: política configurable por tenant + purga automática de logs viejos.
+
+**Decision:** Extender `app/compliance/` con retención:
+1. **Opt-in por tenant:** sin `RetentionPolicy` habilitada para una tabla, esa tabla se conserva indefinidamente (comportamiento actual). Nunca borramos por sorpresa el rastro de un cliente regulado.
+2. **Allowlist (`retention.py`):** solo logs operativos son purgables por edad — `audit_log`, `activity_logs`, `agent_interactions`, `notifications`, `approval_requests`. Los datos core (users, agents, tasks, knowledge, credentials) NO: esos salen por erase-tenant/erase-user, no por edad.
+3. **7º background worker** (diario): para cada política habilitada, borra filas más viejas que `retention_days` y audita la purga (`RETENTION_PURGED`). El trigger append-only de `audit_log` bloquea UPDATE pero permite DELETE — exactamente para esto.
+4. **Cutoff en SQL (`now() - make_interval`)**, no bindeando datetime de Python: las tablas elegibles mezclan columnas tz-aware (`audit_log`) y naive (`notifications`), y bindear un datetime aware contra una columna naive revienta en asyncpg.
+5. `retention_policies` (con `organization_id`) entra al plan de borrado de P0.7 y a la clasificación — el test de cobertura de compliance lo exige.
+
+**Alternatives considered:**
+- *Defaults de retención aplicados automáticamente:* riesgoso (borrado sorpresa). Opt-in + valores recomendados expuestos en el endpoint `eligible` (audit_log 7 años, logs operativos 90-365 días).
+- *Permitir retención sobre datos core:* rechazado — la allowlist excluye explícitamente users/agents/tasks/etc. Esos datos solo se borran por derecho al olvido.
+- *Cutoff con datetime de Python:* falla por el mix tz-aware/naive de las columnas; `make_interval` lo evita.
+
+**Risks/Limitations:**
+- El cutoff vía `now()` para columnas naive depende del TimeZone de la sesión PG (asume UTC, como corre el server). A granularidad de días es inmaterial.
+- El worker sigue en el proceso FastAPI (single-process) — migra a proceso aparte en A1.
+- No hay UI todavía; la config es por API admin (OWNER).
+
+**Validación:** 8 tests nuevos (`test_retention.py`: eligible, CRUD upsert/list/delete, allowlist, rol, purga borra-viejos/keep-fresh/audita, opt-in, disabled) → **182 verde**. Migration `e4b9d1f2c8a3` aplicada a dev. Validado en env limpio réplica del CI.
+
+**Improvement opportunities:** UI de retención (P2); aplicar defaults recomendados con un click; métricas de cuánto purga por semana.

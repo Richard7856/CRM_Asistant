@@ -45,6 +45,7 @@ from app.workers.heartbeat_monitor import run_monitor as run_heartbeat_monitor
 from app.workers.integration_health_checker import run_health_checker
 from app.workers.lifecycle_monitor import run_lifecycle_monitor
 from app.workers.approval_expirer import run_approval_expirer
+from app.workers.retention_purger import run_retention_purger
 from app.auth.service import cleanup_expired_blacklist
 from app.core.database import async_session_factory, get_db
 
@@ -99,6 +100,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(
             run_approval_expirer(interval_seconds=300),  # expire stale approvals every 5 min
             name="approval_expirer",
+        ),
+        asyncio.create_task(
+            run_retention_purger(interval_seconds=86400),  # purge expired data daily
+            name="retention_purger",
         ),
     ]
     logger.info("Started %d background workers", len(worker_tasks))
