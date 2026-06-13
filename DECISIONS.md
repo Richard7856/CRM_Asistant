@@ -890,3 +890,31 @@ Modificados:
 - ✅ "Autonomy escalable según confianza" (4 niveles configurables por scope)
 
 **Próximo bloque P0:** P0.6 — CEO Agent híbrido (pattern matching + LLM fallback) que reduce token usage en queries conocidas. Otra opción: P0.7 LFPDPPP compliance básico (right to be forgotten + retention policy). HDI requeriría P0.7 para firmar, P0.6 mejora la experiencia.
+
+---
+
+## [2026-06-12] Dirección V4 — "La Agencia Autónoma": autonomía continua como destino
+
+**Context:** Con P0.1–P0.5 completos (la capa de gobernanza: Vault, audit log inmutable, MCP Router, aprobación humana), Richard hizo una sesión de re-visión de rumbo. Definió el corazón del proyecto: una **agencia de agentes** — muchos agentes trabajando en conjunto por un objetivo, de forma continua — operando desde nube privada para no exponer datos. El sistema actual es 100% reactivo (humano pide → agentes ejecutan → termina); la visión requiere agentes con objetivos persistentes que trabajan sin que nadie los invoque.
+
+**Decision:** Adoptar Roadmap V4 con estos pilares:
+1. **"Agencia" = concepto central del producto** (no el modelo de negocio): goals persistentes + scheduler/triggers + memoria compartida + coordinación inter-agente. Se materializa en un Track A nuevo (A1–A6).
+2. **Autonomía continua como destino, por etapas y por agente:** Reactivo (hoy) → Proactivo programado → Autónomo continuo. Cada agente/acción se promueve individualmente, nunca la plataforma completa.
+3. **Tres principios nuevos no negociables:** (a) guardrails antes que autonomía — budgets de tokens + kill switch ANTES de encender nada 24/7; (b) Shadow-first — toda automatización nace en Nivel 0 y la autonomía se gana con historial; (c) gateway único de LLM — swap de proveedor por config, no reescritura.
+4. **Negocio = escalera de despliegue, un solo producto:** primeros clientes rentan espacio en nube propia (multi-tenant, operados como servicio); grandes/regulados (HDI) reciben instancia dedicada. Confirma "3 tiers, 1 codebase" de V3.1.
+5. **LLM gradual (Track L):** Claude API hoy → router por sensibilidad de datos → local-first con Claude como respaldo para tareas difíciles. Reemplaza al P3.1 binario.
+6. **Secuencia:** P0.7 (LFPDPPP) → P0.8 (CI/CD+ops, sube por ser prerequisito de 24/7) → A1 → A2 (digest de autonomía = demo vendible) → P1.1 (pgvector, sube por habilitar memoria compartida).
+
+**Alternatives considered:**
+- *Reactivo mejorado* (pulir el modelo actual): menos riesgo, pero cero diferenciación — el mercado de task runners con LLM está saturado.
+- *Proactivo programado como techo* (recomendación inicial de Claude): Richard decidió que es la etapa B, no el destino. La visión completa es continua.
+- *Agencia-servicio puro* (consultoría): ingresos rápidos pero no escala; queda absorbido como "modo operado" de los primeros clientes.
+- *LLM local desde ya*: calidad de razonamiento insuficiente para agentes autónomos y costo de infra prematuro; por eso la migración es gradual con Claude de respaldo.
+
+**Risks/Limitations:**
+- Autonomía continua = riesgo de costos descontrolados (agente en loop quemando tokens de madrugada). Mitigación: A1 no se entrega sin budgets + kill switch; es principio de arquitectura, no feature.
+- Coordinación inter-agente puede generar ciclos de delegación infinitos. Mitigación: max depth + budgets heredados + audit de cadena completa (A5).
+- El scheduler vive en el proceso FastAPI (patrón lifespan actual): suficiente para etapa B, insuficiente para 24/7 real multi-tenant — migrar a proceso separado cuando llegue etapa C.
+- El digest Shadow (A2) puede prometer de más en ventas si los agentes en Shadow alucinan acciones que no podrían ejecutar realmente — revisar calidad antes de mostrarlo a HDI.
+
+**Improvement opportunities:** Landing v3 con la promesa "la agencia trabaja aunque nadie pida"; trust score (A6) para automatizar la promoción de niveles; pricing del modo operado (pendiente con primer prospecto); naming del producto (el concepto "agencia" podría entrar al nombre).
