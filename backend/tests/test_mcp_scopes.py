@@ -15,7 +15,7 @@ from app.auth.models import User, UserRole
 from app.auth.service import hash_password
 from app.departments.models import Department
 from app.mcp.models import DepartmentAgentPermission, DepartmentToolPermission
-from app.mcp.service import ScopeService, UserScope
+from app.mcp.service import ScopeService
 from app.agents.models import Agent, AgentOrigin, AgentStatus
 
 

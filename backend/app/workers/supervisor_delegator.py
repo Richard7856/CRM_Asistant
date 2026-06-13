@@ -10,22 +10,18 @@ When a task is assigned to a supervisor agent, this module:
 The supervisor never executes the task directly — it coordinates.
 """
 
-import asyncio
-import json
 import logging
 import time
 import uuid
 from datetime import datetime
 
-import anthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.activities.models import ActivityLog, LogLevel
+from app.activities.models import LogLevel
 from app.agents.models import Agent, AgentStatus
 from app.auth.models import Organization  # noqa: F401 — needed for Agent relationship resolution
-from app.core.events import Event, event_bus
 from app.tasks.models import Task, TaskStatus
 from app.workers.agent_executor import (
     _call_claude_with_retry,

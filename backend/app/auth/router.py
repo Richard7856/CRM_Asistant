@@ -24,6 +24,7 @@ from app.auth.schemas import (
     UserResponse,
 )
 from app.auth.service import (
+    audit_login_failure,
     authenticate_user,
     blacklist_token,
     create_access_token,
@@ -32,7 +33,7 @@ from app.auth.service import (
     refresh_tokens,
     register_user,
 )
-from app.audit.models import AuditEventType, AuditResult
+from app.audit.models import AuditEventType
 from app.audit.service import log_audit_event
 from app.config import settings
 from app.core.database import get_db
@@ -89,11 +90,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticate with email + password. Returns JWT tokens."""
     user = await authenticate_user(body.email, body.password, db)
     if user is None:
-        # Audit: failed login. We don't know the org (could be a probe attempt),
-        # but we record the attempted email in context for security analysis.
-        # Note: this requires committing in a separate session to persist —
-        # for now we skip (would need refactor of session lifecycle).
-        # TODO P0.8: record failed logins in a way that survives the rollback
+        # P0.8: persist the failed attempt in a separate committed session so it
+        # survives this request's rollback (the 401 below rolls back `db`).
+        await audit_login_failure(body.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales invalidas",

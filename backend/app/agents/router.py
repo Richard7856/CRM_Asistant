@@ -10,7 +10,6 @@ from app.agents.schemas import (
     AgentRegisterExternal,
     AgentResponse,
     AgentUpdate,
-    ApiKeyOut,
     RoleCreate,
     RoleResponse,
 )

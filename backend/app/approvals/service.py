@@ -575,3 +575,38 @@ class PolicyService:
         if policy is None:
             raise NotFoundError(f"Policy {policy_id} not found")
         return policy
+
+
+# ─── Background expiration (P0.8) ─────────────────────────────────────────────
+# Module-level (not on the service) so the worker can call it without an org
+# context — it sweeps across ALL tenants in one pass, auditing each request under
+# its own organization_id. Takes a session so it's unit-testable with the test DB;
+# the worker (app/workers/approval_expirer.py) owns opening + committing it.
+async def expire_overdue_approvals(db: AsyncSession) -> int:
+    """Mark PENDING approval requests past their expires_at as EXPIRED. Returns count."""
+    now = datetime.now(timezone.utc)
+    overdue = (
+        await db.execute(
+            select(ApprovalRequest).where(
+                ApprovalRequest.status == ApprovalStatus.PENDING,
+                ApprovalRequest.expires_at.is_not(None),
+                ApprovalRequest.expires_at < now,
+            )
+        )
+    ).scalars().all()
+
+    for req in overdue:
+        req.status = ApprovalStatus.EXPIRED
+        req.decided_at = now
+        await log_audit_event(
+            db,
+            organization_id=req.organization_id,
+            event_type=AuditEventType.APPROVAL_EXPIRED,
+            resource_type="approval_request",
+            resource_id=req.id,
+            actor_agent_id=req.agent_id,
+            result=AuditResult.FAILURE,  # the action did NOT get approved in time
+            context={"action": req.action, "expired_at": now.isoformat()},
+        )
+
+    return len(overdue)

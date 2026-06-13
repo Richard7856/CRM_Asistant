@@ -5,9 +5,8 @@ Available to all roles. These let Claude understand the current state
 of the organization before deciding what to create or delegate.
 """
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from app.agents.models import Agent
 from app.departments.models import Department
 from app.departments.repository import DepartmentRepository
 from app.workers.tool_registry import ToolContext, register_tool

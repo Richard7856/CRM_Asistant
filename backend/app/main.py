@@ -4,8 +4,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.logging import init_sentry, setup_logging
 from app.core.middleware import (
     RateLimitMiddleware,
     RequestTimingMiddleware,
@@ -40,10 +44,14 @@ from app.workers.metrics_calculator import run_metrics_calculator
 from app.workers.heartbeat_monitor import run_monitor as run_heartbeat_monitor
 from app.workers.integration_health_checker import run_health_checker
 from app.workers.lifecycle_monitor import run_lifecycle_monitor
+from app.workers.approval_expirer import run_approval_expirer
 from app.auth.service import cleanup_expired_blacklist
-from app.core.database import async_session_factory
+from app.core.database import async_session_factory, get_db
 
-logging.basicConfig(level=logging.INFO)
+# Structured logging + optional Sentry (P0.8). Configured at import time so even
+# pre-lifespan logs are formatted; init_sentry is a no-op without a DSN.
+setup_logging(settings.log_format, settings.log_level)
+init_sentry(settings.sentry_dsn, settings.sentry_environment)
 logger = logging.getLogger(__name__)
 
 
@@ -87,6 +95,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(
             run_blacklist_cleanup(interval_seconds=3600),  # purge expired entries every hour
             name="blacklist_cleanup",
+        ),
+        asyncio.create_task(
+            run_approval_expirer(interval_seconds=300),  # expire stale approvals every 5 min
+            name="approval_expirer",
         ),
     ]
     logger.info("Started %d background workers", len(worker_tasks))
@@ -154,5 +166,33 @@ app.include_router(compliance_admin_router, prefix=f"{prefix}/admin", tags=["com
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy", "app": settings.app_name}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    """
+    Readiness probe: verifies real DB connectivity, not just that the process is up.
+    Returns 503 if the database can't be reached so load balancers / status pages
+    can route around a degraded instance instead of sending it traffic.
+
+    Uses the request DB session (get_db) so it exercises the same connection path
+    the app actually serves with — and so tests can drive it via the dependency
+    override instead of the pooled engine.
+    """
+    db_ok = True
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+        logger.exception("Health check: database ping failed")
+        # Leave the session clean so get_db's commit on teardown is a no-op.
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
+    payload = {
+        "status": "healthy" if db_ok else "degraded",
+        "app": settings.app_name,
+        "database": "up" if db_ok else "down",
+    }
+    if not db_ok:
+        return JSONResponse(status_code=503, content=payload)
+    return payload

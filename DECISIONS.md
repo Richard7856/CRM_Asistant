@@ -944,3 +944,34 @@ Modificados:
 **Validación:** 10 tests nuevos (clasificación, export, erase-tenant happy/wrong-confirmation/isolation/role, anonimización, inmutabilidad del certificado) → **169 tests verde** sin regresiones. Migration `a7e2c9f4b1d8` aplicada a dev a mano (alembic se cuelga en iCloud).
 
 **Improvement opportunities:** P0.7b retention policy + worker; platform-superadmin para certificados; limpiar deuda enum en P0.8; usar la clasificación para L2 cuando lleguemos al Track L.
+
+---
+
+## [2026-06-12] P0.8 — CI/CD + Ops + limpieza de deuda técnica
+
+**Context:** Antes de operar agentes 24/7 (Track A / A1) hace falta piso operacional: un gate automático que impida romper main, observabilidad, un health real, y cerrar la deuda acumulada (failed-login sin auditar, worker de expiración de approvals faltante, test flaky, inconsistencia de enums, backups inexistentes). El repo nunca había corrido lint en CI.
+
+**Decision:**
+1. **CI con GitHub Actions** (`.github/workflows/ci.yml`): Postgres 16 service + Python 3.12 + `pip install -e ".[dev]"` + `ruff check` + `pytest`. Corre en push y PR a main.
+2. **Branch protection estricta** (decisión de Richard): main requiere PR con el check de CI verde — ya no se commitea directo. Cambia el flujo de trabajo a partir de aquí.
+3. **`/health` real**: chequea conectividad a DB vía `Depends(get_db)` (no el engine pooled — así tests lo manejan por override y prod ejercita la ruta real); 503 si la DB no responde.
+4. **Failed-login auditado**: `audit_login_failure()` escribe `LOGIN_FAILURE` en una **sesión separada y commiteada** que sobrevive al rollback del 401. Solo audita emails que mapean a un usuario real (audit_log.organization_id es NOT NULL); probes a emails desconocidos van a warning (no hay tenant al cual atribuirlos).
+5. **Worker de expiración de approvals** (6º background worker): barre `PENDING` vencidos → `EXPIRED` + audit `APPROVAL_EXPIRED`. La lógica (`expire_overdue_approvals`) es module-level y toma sesión → unit-testeable; el worker abre/commitea.
+6. **Logging JSON estructurado + Sentry opcional**: `LOG_FORMAT=json` para agregadores; Sentry es no-op sin `SENTRY_DSN` (ship sin cuenta, se prende con env var).
+7. **Backups**: `scripts/backup.sh` + `restore.sh` (pg_dump | gzip | openssl aes-256, passphrase por env). Restore probado end-to-end localmente. El cron automático espera a AWS.
+8. **Deuda saldada**: deps faltantes declaradas (`anthropic`, `cryptography`, `sentry-sdk` — antes solo transitivas, romperían el install limpio del CI); 50 issues de ruff limpiados en todo el repo (imports muertos, vars sin usar); enum NAMES/VALUES en dev sincronizado vía `scripts/sync_dev_enum_labels.py` (additivo, no destructivo — añadió 123 labels NAME); `TEST_DATABASE_URL` ahora configurable por env (CI usa rol `postgres`).
+
+**Alternatives considered:**
+- *CI-on-push sin branch protection* (más ágil para fundador solo): Richard eligió protección estricta por valor de auditoría ISO.
+- */health con engine pooled directo*: rompía en la suite (pool + loops por-test de pytest-asyncio reúsan conexión entre loops → 503). `Depends(get_db)` lo resuelve y es más correcto (ejercita la ruta real de request).
+- *Recrear los enums de dev limpiamente*: requería alterar columnas y tipos (riesgoso). Como no hay prod y las tablas afectadas estaban vacías, el approach additivo (añadir labels NAME) es seguro; el recreate limpio espera a que exista un prod a migrar.
+- *Sentry hard dependency siempre activo*: se prefirió hook opcional (no-op sin DSN) para no exigir cuenta.
+
+**Risks/Limitations:**
+- El scheduler/workers siguen en el proceso FastAPI (single-process) — suficiente para etapa B, migra a proceso aparte para 24/7 real (anotado para A1).
+- Backups automatizados (cron) y status page público quedan pendientes de hosting (AWS). Los scripts están listos; falta el scheduler del host.
+- El fix de enum es additivo: los enums de dev quedan con labels duplicados (VALUE viejo + NAME). Funcional pero no estético; recreate limpio cuando haya prod.
+
+**Validación:** 5 tests nuevos (`test_ops.py`: health, expiración ×2, failed-login ×2) → **174 verde**. Ruff limpio en `app tests`. Backup+restore probado end-to-end (dump cifrado → restore en DB scratch → datos verificados).
+
+**Improvement opportunities:** cron de backup + offsite cuando exista AWS; status page (P1.10); migrar scheduler a proceso separado en A1; recreate limpio de enums cuando haya prod.

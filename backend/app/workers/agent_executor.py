@@ -30,7 +30,6 @@ _API_TIMEOUT_SECONDS = 90  # hard cap — if Claude hasn't responded in 90s, fai
 
 from app.activities.models import ActivityLog, LogLevel
 from app.agents.models import Agent, AgentOrigin, AgentStatus, RoleLevel
-from app.approvals.models import AutonomyLevel
 from app.approvals.service import ApprovalService
 from app.audit.models import AuditEventType, AuditResult
 from app.audit.service import log_audit_event
@@ -267,7 +266,7 @@ async def _call_claude_with_retry(
             # Covers 500 and 529 (overloaded)
             last_exc = exc
             logger.warning("Claude API server error on attempt %d/%d: %s", attempt + 1, _MAX_RETRIES, exc)
-        except anthropic.APIError as exc:
+        except anthropic.APIError:
             # Non-retryable API errors (400, 401, 403) — fail immediately
             raise
 
@@ -721,7 +720,7 @@ def _resolve_agent_tools(agent: Agent) -> list[dict]:
     if not isinstance(tool_names, list) or not tool_names:
         return []
 
-    from app.workers.tool_definitions import ALL_TOOLS, get_tools_for_role
+    from app.workers.tool_definitions import ALL_TOOLS
 
     # Determine the agent's role level for permission filtering
     role_level = RoleLevel.AGENT  # default — most restrictive

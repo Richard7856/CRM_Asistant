@@ -16,6 +16,12 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "python-jose[cryptography]>=3.3.0",
     "python-multipart>=0.0.9",
+    # Declared explicitly because app code imports them directly (P0.8 — they
+    # were only present transitively before, which would break a clean CI install).
+    "anthropic>=0.69.0",
+    "cryptography>=42.0.0",
+    # Optional error tracking — inert unless SENTRY_DSN is set (see app/core/logging.py).
+    "sentry-sdk[fastapi]>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +43,12 @@ packages = ["app"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+# agent_executor imports app.workers.tools (and tool_definitions/registry) AFTER its
+# exception classes on purpose — those modules import these exceptions, so importing
+# them at the top would create a circular import. E402 is the expected trade-off.
+"app/workers/agent_executor.py" = ["E402"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -28,7 +28,7 @@ from app.agents.schemas import (
     RoleCreate,
     RoleResponse,
 )
-from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.departments.models import Department
 

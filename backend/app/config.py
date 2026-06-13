@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     # Must be a 32-byte base64-encoded value. NEVER commit this to git.
     vault_encryption_key: str = ""
 
+    # Observability (P0.8)
+    # log_format: "text" for readable local dev, "json" for prod log aggregators
+    # (CloudWatch/Loki). sentry_dsn empty = error tracking off (no-op hook).
+    log_format: str = "text"
+    log_level: str = "INFO"
+    sentry_dsn: str = ""
+    sentry_environment: str = "development"
+
 
 settings = Settings()
 

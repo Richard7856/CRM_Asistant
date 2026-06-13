@@ -6,7 +6,7 @@ Run periodically (e.g., every 60 seconds via scheduler or cron).
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select, update
 
