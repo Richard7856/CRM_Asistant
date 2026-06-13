@@ -7,7 +7,6 @@ Covers happy paths AND every denial path (each generates an audit entry).
 
 import uuid
 
-import pytest
 from sqlalchemy import select
 
 from app.agents.models import Agent, AgentOrigin, AgentStatus, Role, RoleLevel
@@ -215,7 +214,7 @@ class TestRouteEndpoint:
     async def test_member_supervisor_not_in_scope_returns_403(self, client, db, test_org):
         """Member is in dept, dept has supervisor, but supervisor not granted to dept scope."""
         dept = await _make_department(db, test_org.id, "ScopelessDept")
-        supervisor = await _make_supervisor_agent(db, test_org.id, dept.id)
+        await _make_supervisor_agent(db, test_org.id, dept.id)  # dept needs a head; intentionally not scoped
         member = await _make_member(db, test_org.id, dept.id)
         headers = _auth_headers(member, test_org.id)
 

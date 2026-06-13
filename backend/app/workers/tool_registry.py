@@ -11,7 +11,7 @@ is just a decorated async function, no executor changes needed.
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Coroutine
 
 import uuid

@@ -17,7 +17,6 @@ import uuid
 
 import pytest
 from sqlalchemy import select, text
-from sqlalchemy.exc import InternalError
 
 from app.audit.models import AuditEventType, AuditLog, AuditResult
 from app.audit.service import _hash_payload, log_audit_event

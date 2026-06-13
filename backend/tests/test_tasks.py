@@ -20,10 +20,8 @@ calls would cost money, be slow (10–60s), and produce non-deterministic result
 import uuid
 
 import anthropic
-import pytest
-from sqlalchemy import select
 
-from app.agents.models import Agent, AgentStatus
+from app.agents.models import AgentStatus
 from app.tasks.models import Task, TaskStatus
 from app.workers.agent_executor import execute_task
 

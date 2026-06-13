@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_org_id
 from app.core.database import get_db
-from app.notifications.schemas import NotificationMarkRead, NotificationResponse, UnreadCountResponse
+from app.notifications.schemas import NotificationResponse, UnreadCountResponse
 from app.notifications.service import NotificationService
 
 router = APIRouter()

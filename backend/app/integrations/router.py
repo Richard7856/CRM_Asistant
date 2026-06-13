@@ -1,11 +1,9 @@
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.integrations.adapters import AdapterRegistry
 from app.integrations.schemas import (
     BulkHealthResponse,
     IntegrationHealthResponse,

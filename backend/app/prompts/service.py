@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.agents.models import Agent, AgentDefinition
-from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.prompts.models import PromptTemplate, PromptVersion
 from app.prompts.repository import PromptRepository
@@ -108,7 +108,7 @@ class PromptService:
     async def activate_version(
         self, agent_id: uuid.UUID, version_number: int
     ) -> PromptVersionResponse:
-        agent = await self._get_agent_or_404(agent_id)
+        await self._get_agent_or_404(agent_id)  # raises 404 if the agent doesn't exist
         version = await self.repo.get_version(agent_id, version_number)
         if version is None:
             raise NotFoundError(

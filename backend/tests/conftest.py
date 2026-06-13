@@ -18,6 +18,7 @@ Fixtures:
 - `auth_headers` (function) — Bearer token headers for test_user
 """
 
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from types import SimpleNamespace
@@ -47,16 +48,14 @@ from app.auth.service import create_access_token, hash_password
 from app.core.database import Base, get_db
 from app.core.middleware import reset_rate_limit_state
 from app.main import app
-from app.tasks.models import Task, TaskStatus
 
 # Import ALL models so they register with Base.metadata before create_all runs.
 # Keep this list in sync with alembic/env.py.
 from app.agents.models import (  # noqa: F401
-    Agent, AgentDefinition, AgentIntegration, ApiKey,
+    ApiKey,
     Permission, Role, RolePermission,
 )
 from app.departments.models import Department  # noqa: F401
-from app.tasks.models import Task  # noqa: F401
 from app.activities.models import ActivityLog  # noqa: F401
 from app.metrics.models import PerformanceMetric  # noqa: F401
 from app.interactions.models import AgentInteraction  # noqa: F401
@@ -73,8 +72,11 @@ from app.compliance.models import ErasureCertificate  # noqa: F401
 
 
 # Test database — separate from dev so a destructive test can never harm seed data.
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://richardfigueroa@localhost:5432/crm_agents_test"
+# Overridable via env so CI (where the role is `postgres`, not `richardfigueroa`)
+# can point at its own Postgres service.
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://richardfigueroa@localhost:5432/crm_agents_test",
 )
 
 

@@ -12,7 +12,6 @@ from app.agents.models import Agent, RoleLevel
 from app.agents.schemas import AgentCreateInternal
 from app.agents.service import AgentService
 from app.core.events import Event, event_bus
-from app.departments.models import Department
 from app.departments.repository import DepartmentRepository
 from app.workers.tool_registry import ToolContext, register_tool
 

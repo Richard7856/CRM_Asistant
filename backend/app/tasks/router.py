@@ -15,7 +15,7 @@ from app.auth.dependencies import get_current_user, get_org_id
 from app.auth.models import User
 from app.tasks.service import TaskService
 from app.workers.agent_executor import execute_task_background
-from app.agents.models import Agent, Role, RoleLevel
+from app.agents.models import Agent, RoleLevel
 
 router = APIRouter()
 

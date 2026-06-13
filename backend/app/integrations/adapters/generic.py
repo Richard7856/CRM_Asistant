@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from .base import AgentState, BaseAdapter, HealthStatus, NormalizedEvent, TaskResult
+from .base import BaseAdapter, HealthStatus, NormalizedEvent, TaskResult
 
 
 class GenericAdapter(BaseAdapter):

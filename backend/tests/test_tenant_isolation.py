@@ -19,7 +19,6 @@ is the single worst-case scenario for an enterprise SaaS.
 
 import uuid
 
-import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.models import Agent, AgentOrigin, AgentStatus

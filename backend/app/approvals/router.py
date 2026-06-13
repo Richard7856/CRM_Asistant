@@ -7,7 +7,7 @@ department heads to approve only their own dept's requests.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.approvals.models import ApprovalStatus

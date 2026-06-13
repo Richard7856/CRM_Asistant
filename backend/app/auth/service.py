@@ -3,6 +3,7 @@ Auth service — handles user registration, login, and JWT lifecycle.
 Passwords hashed with bcrypt via passlib. Tokens signed with HS256 via python-jose.
 """
 
+import logging
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -15,8 +16,13 @@ from sqlalchemy.orm import selectinload
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.audit.models import AuditEventType, AuditResult
+from app.audit.service import log_audit_event
 from app.auth.models import Organization, TokenBlacklist, User, UserRole
 from app.config import settings
+from app.core.database import async_session_factory
+
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -129,6 +135,48 @@ async def authenticate_user(
     if not user.is_active:
         return None
     return user
+
+
+async def _write_login_failure(db: AsyncSession, email: str) -> bool:
+    """
+    Write a LOGIN_FAILURE audit row for a failed login attempt. Returns True if
+    written, False if skipped.
+
+    We can only audit when the email maps to a real user — audit_log.organization_id
+    is NOT NULL, so a probe against an unknown email has no tenant to attribute it
+    to and is logged as a warning instead. This is the testable core; the wrapper
+    below owns the separate session.
+    """
+    user = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if user is None:
+        logger.warning("Failed login for unknown email: %s", email)
+        return False
+    await log_audit_event(
+        db,
+        organization_id=user.organization_id,
+        event_type=AuditEventType.LOGIN_FAILURE,
+        actor_user_id=user.id,
+        result=AuditResult.FAILURE,
+        context={"email": email},
+    )
+    return True
+
+
+async def audit_login_failure(email: str) -> None:
+    """
+    Record a failed login in its OWN committed session so it survives the request's
+    rollback (the 401 HTTPException rolls back the request transaction, which is why
+    the previous TODO couldn't persist it). Best-effort: never let auditing break the
+    login response — swallow and log any error.
+    """
+    try:
+        async with async_session_factory() as session:
+            if await _write_login_failure(session, email):
+                await session.commit()
+    except Exception:
+        logger.exception("Failed to audit login failure for %s", email)
 
 
 async def get_user_by_id(user_id: uuid.UUID, db: AsyncSession) -> User | None:

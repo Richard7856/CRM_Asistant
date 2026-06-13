@@ -6,7 +6,7 @@ import re
 import uuid
 import logging
 
-from sqlalchemy import func, select, or_, delete
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
