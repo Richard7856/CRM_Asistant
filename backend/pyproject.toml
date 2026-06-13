@@ -16,6 +16,10 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
     "passlib[bcrypt]>=1.7.4",
+    # passlib 1.7.4 (unmaintained) breaks on bcrypt >=4.1 (removed __about__ +
+    # strict 72-byte limit). 4.0.1 is the newest that works AND has py3.12 wheels.
+    # Local previously had bcrypt 3.2.2; CI pulled 5.x and broke. Pin to align both.
+    "bcrypt==4.0.1",
     "python-jose[cryptography]>=3.3.0",
     "python-multipart>=0.0.9",
     # Declared explicitly because app code imports them directly (P0.8 — they
