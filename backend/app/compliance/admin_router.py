@@ -25,8 +25,11 @@ from app.compliance.schemas import (
     DataClassificationResponse,
     EraseTenantRequest,
     ErasureCertificateResponse,
+    RetentionEligibleResponse,
+    RetentionPolicyResponse,
+    RetentionPolicyUpsert,
 )
-from app.compliance.service import ComplianceService
+from app.compliance.service import ComplianceService, RetentionService
 from app.core.database import get_db
 
 router = APIRouter()
@@ -41,6 +44,14 @@ def _get_service(
     user: User = Depends(get_current_user),
 ) -> ComplianceService:
     return ComplianceService(db, org_id, actor_user_id=user.id)
+
+
+def _get_retention_service(
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_org_id),
+    user: User = Depends(get_current_user),
+) -> RetentionService:
+    return RetentionService(db, org_id, actor_user_id=user.id)
 
 
 @router.get(
@@ -116,3 +127,56 @@ async def erase_user(
     service = ComplianceService(db, org_id, actor_user_id=user.id)
     certificate = await service.erase_user(user_id, requester=user)
     return ErasureCertificateResponse.model_validate(certificate)
+
+
+# ─── Retention (P0.7b) ────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/compliance/retention/eligible",
+    response_model=RetentionEligibleResponse,
+    dependencies=[_owner_or_admin],
+)
+async def get_retention_eligible(service: RetentionService = Depends(_get_retention_service)):
+    """Which tables can have a retention policy + recommended windows."""
+    return RetentionEligibleResponse(eligible=service.get_eligible())
+
+
+@router.get(
+    "/compliance/retention/policies",
+    response_model=list[RetentionPolicyResponse],
+    dependencies=[_owner_or_admin],
+)
+async def list_retention_policies(service: RetentionService = Depends(_get_retention_service)):
+    policies = await service.list_policies()
+    return [RetentionPolicyResponse.model_validate(p) for p in policies]
+
+
+@router.put(
+    "/compliance/retention/policies",
+    response_model=RetentionPolicyResponse,
+    dependencies=[_owner_only],
+)
+async def upsert_retention_policy(
+    body: RetentionPolicyUpsert,
+    service: RetentionService = Depends(_get_retention_service),
+):
+    """Create or update the retention policy for one eligible table."""
+    policy = await service.upsert_policy(
+        table_name=body.table_name,
+        retention_days=body.retention_days,
+        is_enabled=body.is_enabled,
+    )
+    return RetentionPolicyResponse.model_validate(policy)
+
+
+@router.delete(
+    "/compliance/retention/policies/{policy_id}",
+    status_code=204,
+    dependencies=[_owner_only],
+)
+async def delete_retention_policy(
+    policy_id: uuid.UUID,
+    service: RetentionService = Depends(_get_retention_service),
+):
+    await service.delete_policy(policy_id)

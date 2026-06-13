@@ -54,3 +54,36 @@ class DataClassificationResponse(BaseModel):
         "Clasificación de datos por tabla (PII / operacional / metadata). "
         "Base para el derecho de acceso y para el ruteo por sensibilidad del LLM."
     )
+
+
+# ─── Retention (P0.7b) ────────────────────────────────────────────────────────
+
+
+class RetentionPolicyUpsert(BaseModel):
+    """Create or update a retention policy for one eligible table."""
+
+    table_name: str = Field(..., description="Tabla a purgar. Debe estar en la allowlist de retención.")
+    retention_days: int = Field(..., ge=1, description="Días a conservar; filas más viejas se borran.")
+    is_enabled: bool = Field(default=True, description="Si false, la política existe pero no purga.")
+
+
+class RetentionPolicyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    table_name: str
+    retention_days: int
+    is_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class RetentionEligibleResponse(BaseModel):
+    """What tables can have a retention policy + recommended windows."""
+
+    eligible: list[dict]  # [{table, timestamp_column, recommended_days}]
+    note: str = (
+        "Retención opt-in: sin política, la tabla se conserva indefinidamente. "
+        "Solo logs operativos son elegibles — los datos core salen por erase-tenant."
+    )

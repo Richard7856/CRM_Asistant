@@ -55,6 +55,7 @@ TENANT_TABLE_CLASSIFICATION: dict[str, DataClass] = {
     "audit_log": DataClass.PII,              # context JSONB may hold IP / user-agent
     "autonomy_policies": DataClass.OPERATIONAL,
     "approval_requests": DataClass.PII,      # action_input JSONB = exact user input
+    "retention_policies": DataClass.METADATA,  # per-tenant retention config (P0.7b)
 }
 
 # Columns that are PII at the field level — used to label exports and, later, to
@@ -88,6 +89,7 @@ ERASURE_DELETE_ORDER: list[str] = [
     "audit_log",            # → users, agents, organizations
     "approval_requests",    # → agents, tasks, users
     "autonomy_policies",    # → users
+    "retention_policies",   # → users (P0.7b)
     "activity_logs",        # → agents, tasks
     "agent_interactions",   # → agents, tasks
     "performance_metrics",  # → agents

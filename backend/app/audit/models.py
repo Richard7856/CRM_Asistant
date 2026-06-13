@@ -98,6 +98,9 @@ class AuditEventType(str, enum.Enum):
     TENANT_ERASED = "compliance.tenant.erased"
     USER_ERASED = "compliance.user.erased"
     DATA_EXPORTED = "compliance.data.exported"
+    # Retention (P0.7b)
+    RETENTION_POLICY_CHANGED = "compliance.retention.policy.changed"
+    RETENTION_PURGED = "compliance.retention.purged"
 
 
 class AuditResult(str, enum.Enum):

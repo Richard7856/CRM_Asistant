@@ -10,8 +10,9 @@ is atomic.
 import hashlib
 import json
 import uuid
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditEventType
@@ -25,8 +26,14 @@ from app.compliance.models import (
     ErasureCertificate,
     ErasureMethod,
     ErasureSubjectType,
+    RetentionPolicy,
 )
 from app.compliance.repository import ComplianceRepository
+from app.compliance.retention import (
+    RECOMMENDED_RETENTION_DAYS,
+    RETENTION_ELIGIBLE,
+)
+from app.core.database import Base
 from app.core.exceptions import BadRequestError, NotFoundError
 
 
@@ -257,3 +264,159 @@ class ComplianceService:
             total_rows_erased=total,
             content_hash=content_hash,
         )
+
+
+class RetentionService:
+    """CRUD for per-tenant retention policies (P0.7b). The purge itself is the
+    module-level purge_expired_data() below, run by the retention worker."""
+
+    def __init__(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        actor_user_id: uuid.UUID | None = None,
+    ) -> None:
+        self.db = db
+        self.org_id = org_id
+        self.actor_user_id = actor_user_id
+
+    def get_eligible(self) -> list[dict]:
+        return [
+            {
+                "table": table,
+                "timestamp_column": col,
+                "recommended_days": RECOMMENDED_RETENTION_DAYS.get(table),
+            }
+            for table, col in sorted(RETENTION_ELIGIBLE.items())
+        ]
+
+    async def list_policies(self) -> list[RetentionPolicy]:
+        rows = await self.db.execute(
+            select(RetentionPolicy)
+            .where(RetentionPolicy.organization_id == self.org_id)
+            .order_by(RetentionPolicy.table_name)
+        )
+        return list(rows.scalars().all())
+
+    async def upsert_policy(
+        self, table_name: str, retention_days: int, is_enabled: bool
+    ) -> RetentionPolicy:
+        if table_name not in RETENTION_ELIGIBLE:
+            raise BadRequestError(
+                f"Tabla '{table_name}' no es elegible para retención. "
+                f"Elegibles: {', '.join(sorted(RETENTION_ELIGIBLE))}"
+            )
+        existing = (
+            await self.db.execute(
+                select(RetentionPolicy).where(
+                    RetentionPolicy.organization_id == self.org_id,
+                    RetentionPolicy.table_name == table_name,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if existing is not None:
+            existing.retention_days = retention_days
+            existing.is_enabled = is_enabled
+            policy = existing
+        else:
+            policy = RetentionPolicy(
+                organization_id=self.org_id,
+                table_name=table_name,
+                retention_days=retention_days,
+                is_enabled=is_enabled,
+                created_by_user_id=self.actor_user_id,
+            )
+            self.db.add(policy)
+        await self.db.flush()
+
+        await log_audit_event(
+            self.db,
+            organization_id=self.org_id,
+            event_type=AuditEventType.RETENTION_POLICY_CHANGED,
+            resource_type="retention_policy",
+            resource_id=policy.id,
+            actor_user_id=self.actor_user_id,
+            context={
+                "table": table_name,
+                "retention_days": retention_days,
+                "enabled": is_enabled,
+            },
+        )
+        await self.db.refresh(policy)
+        return policy
+
+    async def delete_policy(self, policy_id: uuid.UUID) -> None:
+        policy = (
+            await self.db.execute(
+                select(RetentionPolicy).where(
+                    RetentionPolicy.id == policy_id,
+                    RetentionPolicy.organization_id == self.org_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if policy is None:
+            raise NotFoundError("Política de retención no encontrada")
+        table_name = policy.table_name
+        await self.db.delete(policy)
+        await log_audit_event(
+            self.db,
+            organization_id=self.org_id,
+            event_type=AuditEventType.RETENTION_POLICY_CHANGED,
+            resource_type="retention_policy",
+            resource_id=policy_id,
+            actor_user_id=self.actor_user_id,
+            context={"table": table_name, "deleted": True},
+        )
+
+
+async def purge_expired_data(db: AsyncSession) -> int:
+    """
+    Delete rows past their retention window for every ENABLED policy across all
+    tenants, auditing each purge (RETENTION_PURGED). Returns total rows deleted.
+
+    Module-level + session-arg so it's unit-testable and the worker
+    (app/workers/retention_purger.py) owns opening + committing the session.
+    audit_log's append-only trigger blocks UPDATE but allows DELETE — exactly this.
+    """
+    now = datetime.now(timezone.utc)
+    policies = (
+        await db.execute(
+            select(RetentionPolicy).where(RetentionPolicy.is_enabled.is_(True))
+        )
+    ).scalars().all()
+
+    total = 0
+    for policy in policies:
+        ts_col = RETENTION_ELIGIBLE.get(policy.table_name)
+        if ts_col is None:
+            continue  # table no longer eligible — skip defensively
+        table = Base.metadata.tables[policy.table_name]
+        # Compute the cutoff in SQL (now() - interval) instead of binding a Python
+        # datetime: the eligible tables mix tz-aware (audit_log) and naive
+        # (notifications) timestamp columns, and binding an aware datetime against a
+        # naive column raises in asyncpg. make_interval sidesteps that entirely.
+        cutoff_sql = func.now() - func.make_interval(0, 0, 0, policy.retention_days)
+        result = await db.execute(
+            delete(table).where(
+                table.c.organization_id == policy.organization_id,
+                table.c[ts_col] < cutoff_sql,
+            )
+        )
+        deleted = result.rowcount or 0
+        if deleted > 0:
+            total += deleted
+            cutoff_py = now - timedelta(days=policy.retention_days)
+            await log_audit_event(
+                db,
+                organization_id=policy.organization_id,
+                event_type=AuditEventType.RETENTION_PURGED,
+                resource_type=policy.table_name,
+                context={
+                    "table": policy.table_name,
+                    "deleted": deleted,
+                    "retention_days": policy.retention_days,
+                    "cutoff": cutoff_py.isoformat(),
+                },
+            )
+    return total

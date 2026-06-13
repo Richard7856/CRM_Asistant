@@ -22,7 +22,15 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -73,4 +81,36 @@ class ErasureCertificate(Base):
 
     issued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class RetentionPolicy(Base):
+    """
+    Per-tenant, per-table data retention (P0.7b). The retention worker deletes rows
+    older than `retention_days` for each ENABLED policy. Only tables in
+    retention.RETENTION_ELIGIBLE may have a policy (enforced in the service).
+
+    Opt-in: no row here = that table is never auto-purged for that tenant.
+    """
+
+    __tablename__ = "retention_policies"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "table_name", name="uq_retention_org_table"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    table_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    retention_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
     )
